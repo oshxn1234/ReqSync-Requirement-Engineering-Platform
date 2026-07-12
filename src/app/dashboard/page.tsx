@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useProjectStore } from '@/store/projectStore';
-import { 
-  FileText, 
-  CheckCircle2, 
-  Clock, 
-  HelpCircle, 
+import {
+  FileText,
+  CheckCircle2,
+  Clock,
+  HelpCircle,
   AlertTriangle,
   ArrowUpRight,
   TrendingUp,
@@ -23,7 +23,7 @@ export default function Dashboard() {
   const requirements = useProjectStore((state) => state.requirements);
   const approvals = useProjectStore((state) => state.approvals);
   const currentUser = useProjectStore((state) => state.currentUser);
-  
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -39,7 +39,7 @@ export default function Dashboard() {
   // Calculate stats dynamically based on store content
   const baseReqCount = 121; // Offset to match mockup counts
   const totalRequirements = baseReqCount + requirements.length;
-  
+
   const approvedReqs = requirements.filter(r => r.status === 'Approved').length;
   const approvedCount = 95 + approvedReqs;
   const approvedPercentage = Math.round((approvedCount / totalRequirements) * 100);
@@ -136,9 +136,9 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
-            <div 
-              className="bg-amber-500 h-full rounded-full" 
-              style={{ width: `${Math.round((inProgressCount / totalRequirements) * 100)}%` }} 
+            <div
+              className="bg-amber-500 h-full rounded-full"
+              style={{ width: `${Math.round((inProgressCount / totalRequirements) * 100)}%` }}
             />
           </div>
         </div>
@@ -221,19 +221,19 @@ export default function Dashboard() {
         {/* Trackability Coverage Radial Ring */}
         <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs flex flex-col justify-between">
           <h3 className="font-bold text-slate-800 text-sm tracking-wide">Traceability Coverage</h3>
-          
+
           <div className="flex flex-col items-center justify-center py-6">
             <div className="relative w-36 h-36">
               {/* SVG circular track */}
               <svg className="w-full h-full transform -rotate-90">
                 <circle cx="72" cy="72" r="60" stroke="#f1f5f9" strokeWidth="12" fill="transparent" />
-                <circle 
-                  cx="72" 
-                  cy="72" 
-                  r="60" 
-                  stroke="#10b981" 
-                  strokeWidth="12" 
-                  fill="transparent" 
+                <circle
+                  cx="72"
+                  cy="72"
+                  r="60"
+                  stroke="#10b981"
+                  strokeWidth="12"
+                  fill="transparent"
                   strokeDasharray={`${2 * Math.PI * 60}`}
                   strokeDashoffset={`${2 * Math.PI * 60 * (1 - 0.82)}`}
                   strokeLinecap="round"
@@ -271,7 +271,7 @@ export default function Dashboard() {
               <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto space-y-4 pr-1 mt-2 scrollbar-thin">
             <div className="flex gap-3 text-xs leading-normal">
               <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 font-bold">A</div>
@@ -282,7 +282,7 @@ export default function Dashboard() {
                 <span className="text-[10px] text-slate-400 mt-1">3 hours ago</span>
               </div>
             </div>
-            
+
             <div className="flex gap-3 text-xs leading-normal">
               <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 font-bold">M</div>
               <div className="flex flex-col min-w-0">
@@ -325,7 +325,7 @@ export default function Dashboard() {
               <Sparkles className="w-5 h-5 text-indigo-600" />
               <h3 className="font-bold text-slate-800 text-sm tracking-wide">AI Insights</h3>
             </div>
-            
+
             <div className="space-y-3.5">
               <div className="p-3 bg-amber-50/50 border border-amber-200/60 rounded-xl flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
@@ -358,7 +358,7 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          
+
           <div className="pt-4 border-t border-slate-100 mt-4">
             <Link href="/ai-analysis" className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5">
               <span>Launch Complete AI Check</span>
@@ -370,7 +370,7 @@ export default function Dashboard() {
         {/* Project Health (Custom Radar representation) */}
         <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs flex flex-col justify-between">
           <h3 className="font-bold text-slate-800 text-sm tracking-wide">Project Health</h3>
-          
+
           {/* SVG Radar Visual */}
           <div className="flex justify-center items-center py-4">
             <div className="relative w-44 h-44">
@@ -379,17 +379,17 @@ export default function Dashboard() {
                 <circle cx="50" cy="50" r="45" stroke="#f1f5f9" strokeWidth="1" fill="none" />
                 <circle cx="50" cy="50" r="30" stroke="#f1f5f9" strokeWidth="1" fill="none" />
                 <circle cx="50" cy="50" r="15" stroke="#f1f5f9" strokeWidth="1" fill="none" />
-                
+
                 {/* Axis lines */}
                 <line x1="50" y1="5" x2="50" y2="95" stroke="#e2e8f0" strokeWidth="0.5" />
                 <line x1="5" y1="50" x2="95" y2="50" stroke="#e2e8f0" strokeWidth="0.5" />
-                
+
                 {/* Target Poly (dashed grey) */}
                 <polygon points="50,15 80,50 50,85 20,50" stroke="#94a3b8" strokeDasharray="2,2" strokeWidth="1" fill="none" />
-                
+
                 {/* Current Poly (solid blue-green fill) */}
                 <polygon points="50,22 75,50 50,78 25,50" stroke="#2563eb" strokeWidth="1.5" fill="rgba(37, 99, 235, 0.15)" />
-                
+
                 {/* Axis Labels */}
                 <text x="50" y="10" textAnchor="middle" className="text-[6px] font-bold fill-slate-400">Collaboration</text>
                 <text x="94" y="52" textAnchor="end" className="text-[6px] font-bold fill-slate-400">Traceability</text>
@@ -415,7 +415,7 @@ export default function Dashboard() {
         <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs flex flex-col justify-between">
           <div>
             <h3 className="font-bold text-slate-800 text-sm tracking-wide pb-4">Top Risk Requirements</h3>
-            
+
             <div className="divide-y divide-slate-100">
               {riskRequirements.map((req) => (
                 <div key={req.id} className="py-3 flex items-center justify-between">
