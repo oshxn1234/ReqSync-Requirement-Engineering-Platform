@@ -106,6 +106,7 @@ interface ProjectState {
   settings: ProjectSettings;
   users: AppUser[];
   currentUser: AppUser | null;
+  isSidebarOpen: boolean;
   
   // Actions
   addRequirement: (req: Omit<Requirement, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'completeness' | 'completenessBreakdown' | 'aiSuggestions' | 'affectedReqs' | 'affectedTasks' | 'affectedStories' | 'affectedTestCases' | 'impactExplanation'>) => void;
@@ -126,6 +127,7 @@ interface ProjectState {
   createUserAccount: (name: string, email: string, password: string, role: AppUser['role'], skills?: string) => boolean;
   updateUserRole: (userId: string, role: AppUser['role']) => void;
   deleteUserAccount: (userId: string) => void;
+  toggleSidebar: () => void;
 }
 
 export const useProjectStore = create<ProjectState>()(
@@ -166,6 +168,7 @@ export const useProjectStore = create<ProjectState>()(
         }
       ],
       currentUser: null,
+      isSidebarOpen: true,
       requirements: [
         {
           id: 'REQ-128',
@@ -785,6 +788,8 @@ export const useProjectStore = create<ProjectState>()(
             settings: updatedSettings
           };
         }),
+
+      toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 
       createUserAccount: (name, email, password, role, skills) => {
         let created = false;
