@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useProjectStore } from '@/store/projectStore';
-import { Building, Folder, Users, UserPlus, Trash2, Save, Plus, Check, ShieldAlert } from 'lucide-react';
+import { Building, Folder, Users, UserPlus, Trash2, Save, Plus, Check, ShieldAlert, Sparkles, AlertTriangle, ArrowRight, CheckCircle2, BrainCircuit } from 'lucide-react';
 
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
@@ -32,6 +32,39 @@ export default function SettingsPage() {
 
   const [activeTab, setActiveTab] = useState<'company' | 'project' | 'team'>('company');
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // New States for AI Suitability Analysis
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [suitabilityScore, setSuitabilityScore] = useState(0);
+  const [recommendationAccepted, setRecommendationAccepted] = useState(false);
+  const [recommendedReplacement, setRecommendedReplacement] = useState<{name: string, role: string, email: string, skills: string} | null>(null);
+
+  const handleAnalyzeSuitability = () => {
+    setIsAnalyzing(true);
+    setAnalysisComplete(false);
+    setTimeout(() => {
+      setSuitabilityScore(89);
+      setRecommendedReplacement({
+        name: "Emily Davis",
+        role: "QA Engineer",
+        email: "emily.d@company.com",
+        skills: "Unit Testing, E2E Testing, Automation, Security Auditing"
+      });
+      setIsAnalyzing(false);
+      setAnalysisComplete(true);
+    }, 2000);
+  };
+
+  const acceptRecommendation = () => {
+    if (recommendedReplacement) {
+      const updatedMembers = [...teamMembers, recommendedReplacement];
+      setTeamMembers(updatedMembers);
+      updateSettings({ teamMembers: updatedMembers });
+      setRecommendationAccepted(true);
+      setSuitabilityScore(96);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -306,14 +339,157 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+            {/* NEW SECTION: Selected Team Members Summary */}
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 tracking-wide">Selected Team Members</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {teamMembers.map((member) => (
+                  <div key={member.email} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center font-bold text-blue-700 text-xs uppercase">
+                        {member.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-800">{member.name}</span>
+                          <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full font-semibold">{member.role}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400">{member.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {teamMembers.length === 0 && (
+                  <p className="text-xs text-slate-500 italic md:col-span-2">No team members selected. Please add them in the Team Members tab first.</p>
+                )}
+              </div>
+            </div>
+
+            {/* NEW SECTION: Knowledge Vault Team Suitability Analysis */}
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 tracking-wide flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-indigo-600" />
+                Knowledge Vault Team Suitability Analysis
+              </h3>
+              
+              {!analysisComplete && !isAnalyzing && (
+                <button
+                  type="button"
+                  onClick={handleAnalyzeSuitability}
+                  className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <BrainCircuit className="w-4 h-4" />
+                  <span>Analyze Team Suitability</span>
+                </button>
+              )}
+
+              {isAnalyzing && (
+                <div className="flex flex-col items-center justify-center py-8 space-y-4 border border-slate-200 rounded-2xl bg-slate-50">
+                  <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                  <p className="text-xs font-bold text-slate-500 animate-pulse">Running AI match algorithms against Knowledge Vault...</p>
+                </div>
+              )}
+
+              {analysisComplete && (
+                <div className="border border-slate-200 rounded-2xl p-5 bg-white shadow-3xs space-y-5 animate-in fade-in slide-in-from-bottom-2">
+                  <div className="flex flex-col md:flex-row items-center gap-6">
+                    <div className="relative w-24 h-24 shrink-0">
+                      <svg className="w-full h-full transform -rotate-90">
+                        <circle cx="48" cy="48" r="40" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
+                        <circle 
+                          cx="48" 
+                          cy="48" 
+                          r="40" 
+                          stroke={suitabilityScore >= 90 ? '#10b981' : '#3b82f6'} 
+                          strokeWidth="8" 
+                          fill="transparent" 
+                          strokeDasharray={`${2 * Math.PI * 40}`}
+                          strokeDashoffset={`${2 * Math.PI * 40 * (1 - suitabilityScore / 100)}`}
+                          strokeLinecap="round"
+                          className="transition-all duration-1000 ease-out"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-xl font-black text-slate-800">{suitabilityScore}%</span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Match</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 space-y-3">
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Historical Project Matches</h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl">
+                          <span className="block font-semibold text-slate-700">Banking App 2025</span>
+                          <span className="text-[10px] text-emerald-600 font-bold">92% similarity</span>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl">
+                          <span className="block font-semibold text-slate-700">Core Finance Module</span>
+                          <span className="text-[10px] text-emerald-600 font-bold">85% similarity</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Team Member Evaluation</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {teamMembers.map(m => (
+                        <div key={m.email} className="bg-slate-50 border border-slate-100 p-3 rounded-xl space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-xs text-slate-800">{m.name}</span>
+                            <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full">
+                              {m.role === 'CEO' || m.role.includes('Manager') ? '92%' : '85%'} Match
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 leading-relaxed">
+                            Experience: {m.role === 'CEO' ? 'Extensive executive experience.' : 'Past projects match current technical requirements.'}<br/>
+                            Strengths: {m.skills?.split(',')[0] || 'Domain Expertise'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {!recommendationAccepted && recommendedReplacement && (
+                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex flex-col md:flex-row items-center gap-4">
+                      <div className="p-2 bg-amber-100 text-amber-600 rounded-full shrink-0">
+                        <AlertTriangle className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-amber-900">Missing Key Expertise</p>
+                        <p className="text-[10px] text-amber-700 mt-1 leading-relaxed">
+                          The current team lacks a dedicated QA role with testing automation experience, which was critical in similar past projects. We recommend adding <strong>{recommendedReplacement.name}</strong> ({recommendedReplacement.role}) to boost your score to 96%.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={acceptRecommendation}
+                        className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold px-4 py-2 rounded-lg transition-colors shadow-xs"
+                      >
+                        Accept Recommendation
+                      </button>
+                    </div>
+                  )}
+                  {recommendationAccepted && (
+                    <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex items-center gap-3">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <p className="text-[11px] font-medium text-emerald-800">
+                        Recommendation applied. QA expertise fulfilled by Emily Davis. Team Suitability Score optimized.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             
             <div className="flex justify-end pt-4 border-t border-slate-100">
               <button
                 type="submit"
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                disabled={!analysisComplete}
+                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save className="w-4 h-4" />
-                <span>Save Project Details</span>
+                <span>Create Project</span>
+                {analysisComplete && <span className="bg-white/20 text-white px-2 py-0.5 rounded text-[10px] ml-1">Score: {suitabilityScore}%</span>}
               </button>
             </div>
           </form>

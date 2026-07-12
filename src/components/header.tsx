@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Search, Settings, HelpCircle, ChevronDown, CheckCircle } from 'lucide-react';
+import { Bell, Search, Settings, HelpCircle, ChevronDown, CheckCircle, Menu } from 'lucide-react';
 import { useProjectStore } from '@/store/projectStore';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -8,6 +8,7 @@ import Link from 'next/link';
 export default function Header() {
   const settings = useProjectStore((state) => state.settings);
   const approvals = useProjectStore((state) => state.approvals);
+  const toggleSidebar = useProjectStore((state) => state.toggleSidebar);
   const [mounted, setMounted] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -31,6 +32,13 @@ export default function Header() {
     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0 relative z-30 shadow-xs">
       {/* Project Selector */}
       <div className="flex items-center gap-4">
+        <button 
+          onClick={toggleSidebar}
+          className="p-2 -ml-2 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded-xl transition-all"
+          aria-label="Toggle Sidebar"
+        >
+          <Menu className="w-5.5 h-5.5" />
+        </button>
         <div className="relative group">
           <button className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3.5 py-1.5 rounded-xl text-sm font-semibold text-slate-800 transition-colors">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
