@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -14,10 +14,13 @@ import {
   BarChart3, 
   Database, 
   Settings,
-  Sparkles
+  Sparkles,
+  UserCog,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
+import { useProjectStore } from '@/store/projectStore';
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -35,7 +38,11 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  
+  const currentUser = useProjectStore((state) => state.currentUser);
+  const logout = useProjectStore((state) => state.logout);
 
   useEffect(() => {
     setMounted(true);
@@ -54,6 +61,16 @@ export default function Sidebar() {
     );
   }
 
+  // If user is CEO or Project Manager, add User Management route
+  const isAuthorizedToManageUsers = currentUser?.role === 'Project Manager' || currentUser?.role === 'CEO';
+  const displayedNavItems = isAuthorizedToManageUsers
+    ? [
+        ...navItems.slice(0, 10),
+        { name: 'User Management', href: '/user-management', icon: UserCog },
+        ...navItems.slice(10),
+      ]
+    : navItems;
+
   return (
     <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 text-slate-300">
       {/* Brand Header */}
@@ -71,7 +88,7 @@ export default function Sidebar() {
 
       {/* Nav List */}
       <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-1 scrollbar-thin">
-        {navItems.map((item) => {
+        {displayedNavItems.map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
           return (
             <Link
@@ -95,18 +112,30 @@ export default function Sidebar() {
       </nav>
 
       {/* User Profile Card */}
-      <div className="p-4 border-t border-slate-800 bg-slate-950/40">
-        <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-800/40 transition-colors">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center font-bold text-slate-950 text-sm shadow-md uppercase">
-              SJ
+      <div className="p-4 border-t border-slate-800 bg-slate-950/40 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 p-1 rounded-xl min-w-0">
+            <div className="relative shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center font-bold text-slate-950 text-xs shadow-md uppercase">
+                {currentUser?.name ? currentUser.name.split(' ').map(n => n[0]).join('').slice(0, 2) : 'U'}
+              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-slate-900" />
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900" />
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-bold text-white truncate">{currentUser?.name || 'Guest User'}</span>
+              <span className="text-[10px] text-slate-500 truncate">{currentUser?.role || 'Viewer'}</span>
+            </div>
           </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-semibold text-white truncate">Sarah Johnson</span>
-            <span className="text-xs text-slate-500 truncate">Lead BA</span>
-          </div>
+          <button 
+            onClick={() => {
+              logout();
+              router.replace('/login');
+            }}
+            className="p-2 text-slate-500 hover:text-rose-400 hover:bg-slate-800/40 rounded-xl transition-all cursor-pointer shrink-0"
+            title="Log Out"
+          >
+            <LogOut className="w-4.5 h-4.5" />
+          </button>
         </div>
       </div>
     </aside>

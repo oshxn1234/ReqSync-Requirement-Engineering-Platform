@@ -74,6 +74,15 @@ export interface KnowledgeItem {
   date: string;
 }
 
+export interface AppUser {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  role: 'CEO' | 'Project Manager' | 'Business Analyst' | 'Developer' | 'QA Engineer';
+  skills?: string;
+}
+
 export interface ProjectSettings {
   projectName: string;
   projectCode: string;
@@ -95,6 +104,8 @@ interface ProjectState {
   approvals: Approval[];
   knowledgeVault: KnowledgeItem[];
   settings: ProjectSettings;
+  users: AppUser[];
+  currentUser: AppUser | null;
   
   // Actions
   addRequirement: (req: Omit<Requirement, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'completeness' | 'completenessBreakdown' | 'aiSuggestions' | 'affectedReqs' | 'affectedTasks' | 'affectedStories' | 'affectedTestCases' | 'impactExplanation'>) => void;
@@ -109,11 +120,52 @@ interface ProjectState {
   rejectApproval: (id: string) => void;
   addKnowledge: (item: Omit<KnowledgeItem, 'id' | 'date'>) => void;
   updateSettings: (settings: Partial<ProjectSettings>) => void;
+  login: (email: string, password: string) => boolean;
+  logout: () => void;
+  registerBusiness: (ceoName: string, email: string, password: string, companyName: string, regNumber: string, address: string) => void;
+  createUserAccount: (name: string, email: string, password: string, role: AppUser['role'], skills?: string) => boolean;
+  updateUserRole: (userId: string, role: AppUser['role']) => void;
+  deleteUserAccount: (userId: string) => void;
 }
 
 export const useProjectStore = create<ProjectState>()(
   persist(
     (set) => ({
+      users: [
+        {
+          id: 'USR-001',
+          name: 'Michael Brown',
+          email: 'michael.b@company.com',
+          password: 'password123',
+          role: 'Project Manager',
+          skills: 'Roadmapping, Agile, Backlog Grooming, QA Coordination'
+        },
+        {
+          id: 'USR-002',
+          name: 'Sarah Johnson',
+          email: 'sarah.j@company.com',
+          password: 'password123',
+          role: 'Business Analyst',
+          skills: 'Requirements Elicitation, SRS Design, Business Analysis'
+        },
+        {
+          id: 'USR-003',
+          name: 'John Doe',
+          email: 'john.d@company.com',
+          password: 'password123',
+          role: 'Developer',
+          skills: 'Next.js, React, Zustand, REST APIs, Cryptography'
+        },
+        {
+          id: 'USR-004',
+          name: 'Emily Davis',
+          email: 'emily.d@company.com',
+          password: 'password123',
+          role: 'QA Engineer',
+          skills: 'Unit Testing, E2E Testing, Automation, Security Auditing'
+        }
+      ],
+      currentUser: null,
       requirements: [
         {
           id: 'REQ-128',
@@ -686,7 +738,147 @@ export const useProjectStore = create<ProjectState>()(
       updateSettings: (updates) =>
         set((state) => ({
           settings: { ...state.settings, ...updates }
-        }))
+        })),
+
+      login: (email, password) => {
+        let success = false;
+        set((state) => {
+          const user = state.users.find(
+            (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
+          );
+          if (user) {
+            success = true;
+            return { currentUser: user };
+          }
+          return {};
+        });
+        return success;
+      },
+
+      logout: () => set({ currentUser: null }),
+
+      registerBusiness: (ceoName, email, password, companyName, regNumber, address) =>
+        set((state) => {
+          const newCeo: AppUser = {
+            id: `USR-${Math.max(...state.users.map((u) => parseInt(u.id.split('-')[1]) || 100)) + 1}`,
+            name: ceoName,
+            email,
+            password,
+            role: 'CEO',
+            skills: 'Executive Management, Business Strategy'
+          };
+
+          const updatedSettings = {
+            ...state.settings,
+            companyName,
+            companyRegNumber: regNumber,
+            companyAddress: address,
+            teamMembers: [
+              ...state.settings.teamMembers,
+              { name: ceoName, role: 'CEO', email, skills: 'Executive Management, Business Strategy' }
+            ]
+          };
+
+          return {
+            users: [...state.users, newCeo],
+            currentUser: newCeo,
+            settings: updatedSettings
+          };
+        }),
+
+      createUserAccount: (name, email, password, role, skills) => {
+        let created = false;
+        set((state) => {
+          const exists = state.users.some((u) => u.email.toLowerCase() === email.toLowerCase());
+          if (exists) {
+            return {};
+          }
+          const newUser: AppUser = {
+            id: `USR-${Math.max(...state.users.map((u) => parseInt(u.id.split('-')[1]) || 100)) + 1}`,
+            name,
+            email,
+            password,
+            role,
+            skills: skills || 'No skills listed'
+          };
+          created = true;
+
+          const newTeamMember = {
+            name,
+            role,
+            email,
+            skills: skills || 'No skills listed'
+          };
+
+          return {
+            users: [...state.users, newUser],
+            settings: {
+              ...state.settings,
+              teamMembers: [...state.settings.teamMembers, newTeamMember]
+            }
+          };
+        });
+        return created;
+      },
+
+      updateUserRole: (userId, role) =>
+        set((state) => {
+          const updatedUsers = state.users.map((u) => {
+            if (u.id === userId) {
+              const updated = { ...u, role };
+              return updated;
+            }
+            return u;
+          });
+
+          // Sync with settings teamMembers
+          const userObj = state.users.find((u) => u.id === userId);
+          let updatedTeamMembers = [...state.settings.teamMembers];
+          if (userObj) {
+            updatedTeamMembers = state.settings.teamMembers.map((m) =>
+              m.email.toLowerCase() === userObj.email.toLowerCase() ? { ...m, role } : m
+            );
+          }
+
+          // If current user is updated, update the session
+          const updatedCurrentUser = state.currentUser?.id === userId
+            ? (updatedUsers.find((u) => u.id === userId) ?? null)
+            : state.currentUser;
+
+          return {
+            users: updatedUsers,
+            currentUser: updatedCurrentUser,
+            settings: {
+              ...state.settings,
+              teamMembers: updatedTeamMembers
+            }
+          };
+        }),
+
+      deleteUserAccount: (userId) =>
+        set((state) => {
+          const userToDelete = state.users.find((u) => u.id === userId);
+          if (!userToDelete) return {};
+
+          const updatedUsers = state.users.filter((u) => u.id !== userId);
+
+          // Also sync settings teamMembers
+          const updatedTeamMembers = state.settings.teamMembers.filter(
+            (m) => m.email.toLowerCase() !== userToDelete.email.toLowerCase()
+          );
+
+          // If the logged in user is deleted, log them out
+          const isCurrentUserDeleted = state.currentUser?.id === userId;
+
+          return {
+            users: updatedUsers,
+            settings: {
+              ...state.settings,
+              teamMembers: updatedTeamMembers
+            },
+            currentUser: isCurrentUserDeleted ? null : state.currentUser
+          };
+        })
     }),
     {
       name: 'reqsync-project-store',

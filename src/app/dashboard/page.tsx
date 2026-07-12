@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [mounted, setMounted] = useState(false);
   const requirements = useProjectStore((state) => state.requirements);
   const approvals = useProjectStore((state) => state.approvals);
+  const currentUser = useProjectStore((state) => state.currentUser);
   
   useEffect(() => {
     setMounted(true);
@@ -79,7 +80,7 @@ export default function Dashboard() {
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Dashboard</h1>
         <p className="text-slate-500 text-sm md:text-base">
-          Welcome back, <span className="font-semibold text-slate-800">Sarah</span>! Here&apos;s what&apos;s happening with your project.
+          Welcome back, <span className="font-semibold text-slate-800">{currentUser?.name ? currentUser.name.split(' ')[0] : 'User'}</span>! Here&apos;s what&apos;s happening with your project.
         </p>
       </div>
 

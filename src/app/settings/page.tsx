@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useProjectStore } from '@/store/projectStore';
-import { Building, Folder, Users, UserPlus, Trash2, Save, Plus, Check } from 'lucide-react';
+import { Building, Folder, Users, UserPlus, Trash2, Save, Plus, Check, ShieldAlert } from 'lucide-react';
 
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const settings = useProjectStore((state) => state.settings);
   const updateSettings = useProjectStore((state) => state.updateSettings);
+  const currentUser = useProjectStore((state) => state.currentUser);
+  const isCeo = currentUser?.role === 'CEO';
 
   // Form states
   const [companyName, setCompanyName] = useState('');
@@ -161,16 +163,36 @@ export default function SettingsPage() {
         {activeTab === 'company' && (
           <form onSubmit={handleSaveSettings} className="p-6 space-y-6">
             <div className="space-y-4">
-              <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-2">Company Information</h2>
+              <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                <h2 className="text-base font-bold text-slate-900">Company Information</h2>
+                {currentUser?.role !== 'CEO' && (
+                  <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                    <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+                    Read-Only (CEO Authorization Required)
+                  </span>
+                )}
+              </div>
+              
+              {!isCeo && (
+                <div className="p-3.5 bg-amber-50/50 border border-amber-200/60 rounded-xl text-xs text-amber-800 flex items-start gap-2.5">
+                  <ShieldAlert className="w-4.5 h-4.5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Authorized Access Only</p>
+                    <p className="text-[11px] text-amber-700/90 mt-0.5">Only users registered under the CEO role are permitted to edit corporate business registration parameters.</p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Company Registered Name</label>
                   <input
                     type="text"
                     value={companyName}
+                    disabled={!isCeo}
                     onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="e.g. Acme Corporation Ltd"
-                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500"
+                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-400"
                     required
                   />
                 </div>
@@ -179,9 +201,10 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     value={companyRegNumber}
+                    disabled={!isCeo}
                     onChange={(e) => setCompanyRegNumber(e.target.value)}
                     placeholder="e.g. REG-12345678"
-                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500"
+                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-400"
                     required
                   />
                 </div>
@@ -190,23 +213,26 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     value={companyAddress}
+                    disabled={!isCeo}
                     onChange={(e) => setCompanyAddress(e.target.value)}
                     placeholder="e.g. 123 Main St, New York, NY"
-                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500"
+                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-400"
                   />
                 </div>
               </div>
             </div>
             
-            <div className="flex justify-end pt-4 border-t border-slate-100">
-              <button
-                type="submit"
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-              >
-                <Save className="w-4 h-4" />
-                <span>Save Company Details</span>
-              </button>
-            </div>
+            {isCeo && (
+              <div className="flex justify-end pt-4 border-t border-slate-100">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Company Details</span>
+                </button>
+              </div>
+            )}
           </form>
         )}
 
