@@ -16,7 +16,8 @@ import {
   Settings,
   Sparkles,
   UserCog,
-  LogOut
+  LogOut,
+  Network
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
@@ -27,6 +28,7 @@ const navItems = [
   { name: 'Requirements', href: '/requirements', icon: FileText },
   { name: 'User Stories', href: '/user-stories', icon: Users },
   { name: 'Tasks', href: '/tasks', icon: CheckSquare },
+  { name: 'UML Workspace', href: '/uml-workspace', icon: Network },
   { name: 'Approvals', href: '/approvals', icon: FileCheck },
   { name: 'Baselines', href: '/baselines', icon: Milestone },
   { name: 'Traceability', href: '/traceability', icon: GitMerge },

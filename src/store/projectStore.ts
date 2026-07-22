@@ -41,11 +41,45 @@ export interface UserStory {
 export interface Task {
   id: string;
   title: string;
-  status: 'To Do' | 'In Progress' | 'Done';
+  status: 'To Do' | 'In Progress' | 'Ready for QA' | 'Done';
   priority: 'High' | 'Medium' | 'Low';
   relatedStory: string;
   assignee: string;
   dueDate: string;
+  implementationDetails?: {
+    githubLink: string;
+    notes: string;
+    submittedAt: string;
+  };
+  qaReview?: {
+    reviewer: string;
+    comments: string;
+    reviewedAt: string;
+    status: 'Approved' | 'Changes Requested';
+  };
+}
+
+export interface UmlClass {
+  id: string;
+  name: string;
+  attributes: string[];
+  methods: string[];
+}
+
+export interface UmlRelationship {
+  id: string;
+  sourceClassId: string;
+  targetClassId: string;
+  type: 'Association' | 'Inheritance' | 'Aggregation' | 'Composition' | 'Dependency';
+}
+
+export interface UmlDiagramVersion {
+  version: string;
+  description: string;
+  classes: UmlClass[];
+  relationships: UmlRelationship[];
+  createdAt: string;
+  baselineVersion?: string;
 }
 
 export interface Baseline {
@@ -107,6 +141,13 @@ interface ProjectState {
   users: AppUser[];
   currentUser: AppUser | null;
   isSidebarOpen: boolean;
+
+  // UML Workspace State
+  umlDiagramVersions: UmlDiagramVersion[];
+  currentUmlDiagram: {
+    classes: UmlClass[];
+    relationships: UmlRelationship[];
+  };
   
   // Actions
   addRequirement: (req: Omit<Requirement, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'completeness' | 'completenessBreakdown' | 'aiSuggestions' | 'affectedReqs' | 'affectedTasks' | 'affectedStories' | 'affectedTestCases' | 'impactExplanation'>) => void;
@@ -128,6 +169,17 @@ interface ProjectState {
   updateUserRole: (userId: string, role: AppUser['role']) => void;
   deleteUserAccount: (userId: string) => void;
   toggleSidebar: () => void;
+
+  // New Actions
+  submitTaskImplementation: (taskId: string, githubLink: string, notes: string) => void;
+  submitTaskQaReview: (taskId: string, comments: string, passed: boolean, reviewer: string) => void;
+  generateUmlFromRequirements: () => void;
+  addUmlClass: (name: string) => void;
+  updateUmlClass: (id: string, updates: Partial<UmlClass>) => void;
+  deleteUmlClass: (id: string) => void;
+  addUmlRelationship: (sourceId: string, targetId: string, type: UmlRelationship['type']) => void;
+  deleteUmlRelationship: (id: string) => void;
+  commitUmlToBaseline: (baselineVersion: string, description: string) => void;
 }
 
 export const useProjectStore = create<ProjectState>()(
@@ -169,6 +221,72 @@ export const useProjectStore = create<ProjectState>()(
       ],
       currentUser: null,
       isSidebarOpen: true,
+      umlDiagramVersions: [
+        {
+          version: 'v1.0',
+          description: 'Initial UML Class Diagram mapping Core Authentication and Accounts',
+          createdAt: '2026-06-10',
+          baselineVersion: 'v1.1',
+          classes: [
+            {
+              id: 'c1',
+              name: 'User',
+              attributes: ['id: string', 'email: string', 'role: string', 'isLocked: boolean'],
+              methods: ['login(): boolean', 'logout(): boolean', 'verifyCredentials(): boolean']
+            },
+            {
+              id: 'c2',
+              name: 'Account',
+              attributes: ['accountNumber: string', 'balance: number', 'type: string'],
+              methods: ['deposit(amount: number): boolean', 'withdraw(amount: number): boolean', 'checkBalance(): number']
+            }
+          ],
+          relationships: [
+            {
+              id: 'r1',
+              sourceClassId: 'c1',
+              targetClassId: 'c2',
+              type: 'Association'
+            }
+          ]
+        }
+      ],
+      currentUmlDiagram: {
+        classes: [
+          {
+            id: 'c1',
+            name: 'User',
+            attributes: ['id: string', 'email: string', 'role: string', 'isLocked: boolean'],
+            methods: ['login(): boolean', 'logout(): boolean', 'verifyCredentials(): boolean']
+          },
+          {
+            id: 'c2',
+            name: 'Account',
+            attributes: ['accountNumber: string', 'balance: number', 'type: string'],
+            methods: ['deposit(amount: number): boolean', 'withdraw(amount: number): boolean', 'checkBalance(): number']
+          },
+          {
+            id: 'c3',
+            name: 'Transaction',
+            attributes: ['id: string', 'amount: number', 'status: string', 'timestamp: string'],
+            methods: ['execute(): boolean', 'validate(): boolean']
+          }
+        ],
+        relationships: [
+          {
+            id: 'r1',
+            sourceClassId: 'c1',
+            targetClassId: 'c2',
+            type: 'Association'
+          },
+          {
+            id: 'r2',
+            sourceClassId: 'c2',
+            targetClassId: 'c3',
+            type: 'Composition'
+          }
+        ]
+      },
       requirements: [
         {
           id: 'REQ-128',
@@ -882,6 +1000,189 @@ export const useProjectStore = create<ProjectState>()(
               teamMembers: updatedTeamMembers
             },
             currentUser: isCurrentUserDeleted ? null : state.currentUser
+          };
+        }),
+
+      submitTaskImplementation: (taskId, githubLink, notes) =>
+        set((state) => ({
+          tasks: state.tasks.map((task) =>
+            task.id === taskId
+              ? {
+                  ...task,
+                  status: 'Ready for QA' as const,
+                  implementationDetails: {
+                    githubLink,
+                    notes,
+                    submittedAt: new Date().toISOString().split('T')[0]
+                  }
+                }
+              : task
+          )
+        })),
+
+      submitTaskQaReview: (taskId, comments, passed, reviewer) =>
+        set((state) => ({
+          tasks: state.tasks.map((task) =>
+            task.id === taskId
+              ? {
+                  ...task,
+                  status: (passed ? 'Done' : 'In Progress') as any,
+                  qaReview: {
+                    reviewer,
+                    comments,
+                    reviewedAt: new Date().toISOString().split('T')[0],
+                    status: passed ? 'Approved' as const : 'Changes Requested' as const
+                  }
+                }
+              : task
+          )
+        })),
+
+      generateUmlFromRequirements: () =>
+        set((state) => {
+          const hasMFA = state.requirements.some(r => r.title.toLowerCase().includes('mfa') || r.description.toLowerCase().includes('mfa') || r.title.toLowerCase().includes('multi-factor'));
+          const hasTimeout = state.requirements.some(r => r.title.toLowerCase().includes('timeout') || r.description.toLowerCase().includes('timeout') || r.title.toLowerCase().includes('inactive'));
+
+          const newClasses: UmlClass[] = [
+            {
+              id: 'c1',
+              name: 'User',
+              attributes: ['id: string', 'email: string', 'role: string', 'isLocked: boolean'],
+              methods: ['login(): boolean', 'logout(): boolean', 'verifyCredentials(): boolean']
+            },
+            {
+              id: 'c2',
+              name: 'Account',
+              attributes: ['accountNumber: string', 'balance: number', 'type: string'],
+              methods: ['deposit(amount: number): boolean', 'withdraw(amount: number): boolean', 'checkBalance(): number']
+            },
+            {
+              id: 'c3',
+              name: 'Transaction',
+              attributes: ['id: string', 'amount: number', 'status: string', 'timestamp: string'],
+              methods: ['execute(): boolean', 'validate(): boolean']
+            }
+          ];
+
+          const newRelationships: UmlRelationship[] = [
+            { id: 'r1', sourceClassId: 'c1', targetClassId: 'c2', type: 'Association' },
+            { id: 'r2', sourceClassId: 'c2', targetClassId: 'c3', type: 'Composition' }
+          ];
+
+          if (hasMFA) {
+            newClasses.push({
+              id: 'c4',
+              name: 'MfaVerification',
+              attributes: ['userId: string', 'otpCode: string', 'expiresAt: string', 'attempts: number'],
+              methods: ['sendOTP(): boolean', 'verifyOTP(code: string): boolean', 'isExpired(): boolean']
+            });
+            newRelationships.push({
+              id: 'r3',
+              sourceClassId: 'c1',
+              targetClassId: 'c4',
+              type: 'Dependency'
+            });
+          }
+
+          if (hasTimeout) {
+            newClasses.push({
+              id: 'c5',
+              name: 'SessionTracker',
+              attributes: ['sessionId: string', 'lastActivityTime: string', 'timeoutLimitMinutes: number'],
+              methods: ['trackEvent(): void', 'checkInactivity(): boolean', 'terminateSession(): void']
+            });
+            newRelationships.push({
+              id: 'r4',
+              sourceClassId: 'c1',
+              targetClassId: 'c5',
+              type: 'Association'
+            });
+          }
+
+          return {
+            currentUmlDiagram: {
+              classes: newClasses,
+              relationships: newRelationships
+            }
+          };
+        }),
+
+      addUmlClass: (name) =>
+        set((state) => {
+          const maxId = state.currentUmlDiagram.classes.length > 0 
+            ? Math.max(...state.currentUmlDiagram.classes.map(c => parseInt(c.id.replace('c', '')) || 0)) 
+            : 0;
+          const nextId = `c${maxId + 1}`;
+          const newClass: UmlClass = {
+            id: nextId,
+            name,
+            attributes: [],
+            methods: []
+          };
+          return {
+            currentUmlDiagram: {
+              ...state.currentUmlDiagram,
+              classes: [...state.currentUmlDiagram.classes, newClass]
+            }
+          };
+        }),
+
+      updateUmlClass: (id, updates) =>
+        set((state) => ({
+          currentUmlDiagram: {
+            ...state.currentUmlDiagram,
+            classes: state.currentUmlDiagram.classes.map(c => c.id === id ? { ...c, ...updates } : c)
+          }
+        })),
+
+      deleteUmlClass: (id) =>
+        set((state) => ({
+          currentUmlDiagram: {
+            classes: state.currentUmlDiagram.classes.filter(c => c.id !== id),
+            relationships: state.currentUmlDiagram.relationships.filter(r => r.sourceClassId !== id && r.targetClassId !== id)
+          }
+        })),
+
+      addUmlRelationship: (sourceClassId, targetClassId, type) =>
+        set((state) => {
+          const maxId = state.currentUmlDiagram.relationships.length > 0 
+            ? Math.max(...state.currentUmlDiagram.relationships.map(r => parseInt(r.id.replace('r', '')) || 0)) 
+            : 0;
+          const nextId = `r${maxId + 1}`;
+          const newRel: UmlRelationship = {
+            id: nextId,
+            sourceClassId,
+            targetClassId,
+            type
+          };
+          return {
+            currentUmlDiagram: {
+              ...state.currentUmlDiagram,
+              relationships: [...state.currentUmlDiagram.relationships, newRel]
+            }
+          };
+        }),
+
+      deleteUmlRelationship: (id) =>
+        set((state) => ({
+          currentUmlDiagram: {
+            ...state.currentUmlDiagram,
+            relationships: state.currentUmlDiagram.relationships.filter(r => r.id !== id)
+          }
+        })),
+
+      commitUmlToBaseline: (baselineVersion, description) =>
+        set((state) => {
+          const newVer: UmlDiagramVersion = {
+            version: `UML-${baselineVersion}`,
+            description,
+            classes: JSON.parse(JSON.stringify(state.currentUmlDiagram.classes)),
+            relationships: JSON.parse(JSON.stringify(state.currentUmlDiagram.relationships)),
+            createdAt: new Date().toISOString().split('T')[0],
+            baselineVersion
+          };
+          return {
+            umlDiagramVersions: [newVer, ...state.umlDiagramVersions]
           };
         })
     }),
