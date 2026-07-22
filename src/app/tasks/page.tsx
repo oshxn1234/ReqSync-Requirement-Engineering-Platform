@@ -9,7 +9,7 @@ import {
   Edit2, 
   X, 
   Calendar,
-  Github,
+  GitPullRequest,
   MessageSquare,
   CheckCircle2,
   AlertTriangle,
@@ -420,7 +420,7 @@ export default function Tasks() {
               {simulatedRole === 'Developer' ? (
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1.5">
-                    <Github className="w-4.5 h-4.5 text-slate-700" />
+                    <GitPullRequest className="w-4.5 h-4.5 text-slate-700" />
                     Developer Submission Workspace
                   </h3>
 
