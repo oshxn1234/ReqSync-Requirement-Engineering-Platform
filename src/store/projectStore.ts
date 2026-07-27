@@ -167,6 +167,7 @@ interface ProjectState {
   registerBusiness: (ceoName: string, email: string, password: string, companyName: string, regNumber: string, address: string) => void;
   createUserAccount: (name: string, email: string, password: string, role: AppUser['role'], skills?: string) => boolean;
   updateUserRole: (userId: string, role: AppUser['role']) => void;
+  updateProfile: (userId: string, name: string, skills: string, newPassword?: string) => void;
   deleteUserAccount: (userId: string) => void;
   toggleSidebar: () => void;
 
@@ -1051,6 +1052,45 @@ export const useProjectStore = create<ProjectState>()(
               m.email.toLowerCase() === userObj.email.toLowerCase() ? { ...m, role } : m
             );
           }
+
+          // If current user is updated, update the session
+          const updatedCurrentUser = state.currentUser?.id === userId
+            ? (updatedUsers.find((u) => u.id === userId) ?? null)
+            : state.currentUser;
+
+          return {
+            users: updatedUsers,
+            currentUser: updatedCurrentUser,
+            settings: {
+              ...state.settings,
+              teamMembers: updatedTeamMembers
+            }
+          };
+        }),
+
+      updateProfile: (userId, name, skills, newPassword) =>
+        set((state) => {
+          const userObj = state.users.find((u) => u.id === userId);
+          if (!userObj) return {};
+
+          const updatedUsers = state.users.map((u) => {
+            if (u.id === userId) {
+              return {
+                ...u,
+                name,
+                skills: skills || 'No skills listed',
+                ...(newPassword ? { password: newPassword } : {})
+              };
+            }
+            return u;
+          });
+
+          // Sync with settings teamMembers
+          const updatedTeamMembers = state.settings.teamMembers.map((m) =>
+            m.email.toLowerCase() === userObj.email.toLowerCase()
+              ? { ...m, name, skills: skills || 'No skills listed' }
+              : m
+          );
 
           // If current user is updated, update the session
           const updatedCurrentUser = state.currentUser?.id === userId

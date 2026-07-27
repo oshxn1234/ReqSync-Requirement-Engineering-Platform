@@ -12,6 +12,17 @@ export default function Header() {
   const isSidebarOpen = useProjectStore((state) => state.isSidebarOpen);
   const [mounted, setMounted] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [activeNotificationTab, setActiveNotificationTab] = useState<'system' | 'approvals'>('system');
+
+  const mockNotifications = [
+    { id: '1', title: 'Task Assigned', desc: 'Task "Configure MFA login hooks" has been assigned to John Doe.', type: 'Task Assigned', date: '10m ago' },
+    { id: '2', title: 'Requirement Updated', desc: 'Requirement "REQ-128 session timeout check" was modified by Sarah Johnson.', type: 'Requirement Updated', date: '1h ago' },
+    { id: '3', title: 'AI Generation Completed', desc: 'AI successfully extracted 2 new requirements from recent meeting notes.', type: 'AI Generation Completed', date: '3h ago' },
+    { id: '4', title: 'Approval Request', desc: 'Baseline v1.0 snapshot requires validation approval.', type: 'Approval Request', date: '5h ago' },
+    { id: '5', title: 'QA Feedback', desc: 'QA verification completed on "Login security checks". All audits passed.', type: 'QA Feedback', date: 'Yesterday' },
+    { id: '6', title: 'New Project Created', desc: 'Project "Online Banking System" initialized by CEO.', type: 'New Project', date: '2 days ago' },
+    { id: '7', title: 'Deadline Reminder', desc: 'Submit API baseline documentation due in 24 hours.', type: 'Deadline Reminder', date: 'Tomorrow' },
+  ];
 
   useEffect(() => {
     setMounted(true);
@@ -100,15 +111,55 @@ export default function Header() {
 
             {/* Notifications Dropdown Panel */}
             {showNotifications && (
-              <div className="absolute right-0 mt-2.5 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl py-3 text-slate-800 z-50">
+              <div className="absolute right-0 mt-2.5 w-85 bg-white border border-slate-200 rounded-2xl shadow-xl py-3 text-slate-800 z-50">
                 <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="font-bold text-sm">Notifications</h3>
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
-                    {pendingApprovals.length} Action Needed
+                  <h3 className="font-extrabold text-xs text-slate-900 uppercase tracking-widest">Notification Centre</h3>
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                    Active
                   </span>
                 </div>
+                
+                {/* Notification Centre Tabs */}
+                <div className="flex border-b border-slate-100 px-2 mt-2 bg-slate-50/50">
+                  <button 
+                    onClick={() => setActiveNotificationTab('system')}
+                    className={`flex-1 text-center py-2 text-[10px] font-bold border-b-2 transition-all ${
+                      activeNotificationTab === 'system' 
+                        ? 'border-blue-600 text-blue-600' 
+                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Updates ({mockNotifications.length})
+                  </button>
+                  <button 
+                    onClick={() => setActiveNotificationTab('approvals')}
+                    className={`flex-1 text-center py-2 text-[10px] font-bold border-b-2 transition-all ${
+                      activeNotificationTab === 'approvals' 
+                        ? 'border-blue-600 text-blue-600' 
+                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Approvals ({pendingApprovals.length})
+                  </button>
+                </div>
+
                 <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
-                  {pendingApprovals.length === 0 ? (
+                  {activeNotificationTab === 'system' ? (
+                    mockNotifications.map((notif) => (
+                      <div key={notif.id} className="block px-4 py-3 hover:bg-slate-50 transition-colors">
+                        <div className="flex items-start gap-2.5">
+                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="text-[10px] font-extrabold text-slate-800 truncate uppercase tracking-wider">{notif.title}</span>
+                              <span className="text-[9px] text-slate-400 font-semibold shrink-0">{notif.date}</span>
+                            </div>
+                            <span className="text-[11px] text-slate-500 mt-0.5 leading-normal font-medium">{notif.desc}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : pendingApprovals.length === 0 ? (
                     <div className="px-4 py-6 text-center text-slate-400 text-xs">
                       No pending approval alerts
                     </div>
@@ -121,23 +172,23 @@ export default function Header() {
                         className="block px-4 py-3 hover:bg-slate-50 transition-colors"
                       >
                         <div className="flex items-start gap-2.5">
-                          <span className="mt-1 w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                          <span className="mt-1 w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                           <div className="flex flex-col">
                             <span className="text-xs font-semibold text-slate-800 leading-normal line-clamp-2">{app.title}</span>
-                            <span className="text-[10px] text-slate-400 mt-1">Requested by {app.requestedBy}</span>
+                            <span className="text-[10px] text-slate-450 mt-1 font-semibold">Requested by {app.requestedBy}</span>
                           </div>
                         </div>
                       </Link>
                     ))
                   )}
                 </div>
-                <div className="px-4 pt-2 border-t border-slate-100 text-center">
+                <div className="px-4 pt-2.5 border-t border-slate-100 text-center">
                   <Link 
-                    href="/approvals"
+                    href={activeNotificationTab === 'approvals' ? "/approvals" : "/dashboard"}
                     onClick={() => setShowNotifications(false)}
                     className="text-xs font-bold text-blue-600 hover:text-blue-700"
                   >
-                    View All Approvals
+                    {activeNotificationTab === 'approvals' ? "View All Approvals" : "Go to Dashboard"}
                   </Link>
                 </div>
               </div>

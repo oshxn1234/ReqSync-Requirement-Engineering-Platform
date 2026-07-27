@@ -2,14 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { useProjectStore } from '@/store/projectStore';
-import { Building, Folder, Users, UserPlus, Trash2, Save, Plus, Check, ShieldAlert, Sparkles, AlertTriangle, ArrowRight, CheckCircle2, BrainCircuit } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Building, Folder, Users, UserPlus, Trash2, Save, Plus, Check, ShieldAlert, Sparkles, AlertTriangle, ArrowRight, CheckCircle2, BrainCircuit, User, Lock, BellRing, LogOut } from 'lucide-react';
 
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const settings = useProjectStore((state) => state.settings);
   const updateSettings = useProjectStore((state) => state.updateSettings);
   const currentUser = useProjectStore((state) => state.currentUser);
+  const updateProfile = useProjectStore((state) => state.updateProfile);
+  const logout = useProjectStore((state) => state.logout);
+  const router = useRouter();
+  
   const isCeo = currentUser?.role === 'CEO';
+  const isPm = currentUser?.role === 'Project Manager';
 
   // Form states
   const [companyName, setCompanyName] = useState('');
@@ -30,7 +36,24 @@ export default function SettingsPage() {
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberSkills, setNewMemberSkills] = useState('');
 
-  const [activeTab, setActiveTab] = useState<'company' | 'project' | 'team'>('company');
+  // Profile states
+  const [profileName, setProfileName] = useState('');
+  const [profileSkills, setProfileSkills] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passSuccess, setPassSuccess] = useState(false);
+  const [passError, setPassError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState(false);
+
+  // Notification Preferences
+  const [notifEmailAlerts, setNotifEmailAlerts] = useState(true);
+  const [notifNewProject, setNotifNewProject] = useState(true);
+  const [notifTaskAssigned, setNotifTaskAssigned] = useState(true);
+  const [notifReqUpdated, setNotifReqUpdated] = useState(true);
+  const [notifQaFeedback, setNotifQaFeedback] = useState(true);
+
+  const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'project' | 'team'>('profile');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // New States for AI Suitability Analysis
@@ -81,7 +104,11 @@ export default function SettingsPage() {
       setStatus(settings.status || '');
       setTeamMembers(settings.teamMembers || []);
     }
-  }, [settings]);
+    if (currentUser) {
+      setProfileName(currentUser.name || '');
+      setProfileSkills(currentUser.skills || '');
+    }
+  }, [settings, currentUser]);
 
   if (!mounted) {
     return (
@@ -137,6 +164,52 @@ export default function SettingsPage() {
     updateSettings({ teamMembers: updatedMembers });
   };
 
+  const handleSaveProfileInfo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    updateProfile(currentUser.id, profileName, profileSkills);
+    setProfileSuccess(true);
+    setTimeout(() => setProfileSuccess(false), 3000);
+  };
+
+  const handleSavePasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    setPassError('');
+    setPassSuccess(false);
+
+    if (currentUser.password && currentPassword !== currentUser.password) {
+      setPassError('Current password verification failed.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPassError('New passwords do not match.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPassError('Password must be at least 6 characters.');
+      return;
+    }
+
+    updateProfile(currentUser.id, currentUser.name, currentUser.skills || '', newPassword);
+    setPassSuccess(true);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setTimeout(() => setPassSuccess(false), 3000);
+  };
+
+  const handleSaveNotifPrefs = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleTriggerLogout = () => {
+    logout();
+    router.replace('/login');
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Page Header */}
@@ -155,44 +228,280 @@ export default function SettingsPage() {
       </div>
 
       {/* Navigation tabs */}
-      <div className="flex border-b border-slate-200 bg-white p-1 rounded-xl shadow-xs">
+      <div className="flex border-b border-slate-200 bg-white p-1 rounded-xl shadow-xs gap-1">
         <button
-          onClick={() => setActiveTab('company')}
+          onClick={() => setActiveTab('profile')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-            activeTab === 'company'
+            activeTab === 'profile'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
           }`}
         >
-          <Building className="w-4 h-4" />
-          <span>Company Registration</span>
+          <User className="w-4 h-4" />
+          <span>My Profile & Settings</span>
         </button>
-        <button
-          onClick={() => setActiveTab('project')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-            activeTab === 'project'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-          }`}
-        >
-          <Folder className="w-4 h-4" />
-          <span>Project Creation & Details</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('team')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-            activeTab === 'team'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Team Members</span>
-        </button>
+        {isCeo && (
+          <button
+            onClick={() => setActiveTab('company')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'company'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+          >
+            <Building className="w-4 h-4" />
+            <span>Company Registration</span>
+          </button>
+        )}
+        {(isCeo || isPm) && (
+          <button
+            onClick={() => setActiveTab('project')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'project'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+          >
+            <Folder className="w-4 h-4" />
+            <span>Project Creation & Details</span>
+          </button>
+        )}
+        {(isCeo || isPm) && (
+          <button
+            onClick={() => setActiveTab('team')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'team'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Team Members</span>
+          </button>
+        )}
       </div>
 
       {/* Forms content card */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+        {activeTab === 'profile' && currentUser && (
+          <div className="p-6 space-y-8 divide-y divide-slate-100">
+            {/* View/Edit Profile */}
+            <form onSubmit={handleSaveProfileInfo} className="space-y-4">
+              <div className="flex justify-between items-center pb-2">
+                <h2 className="text-base font-bold text-slate-900">Personal Information</h2>
+                {profileSuccess && (
+                  <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                    <Check className="w-4.5 h-4.5" /> Profile updated successfully!
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 bg-white font-semibold"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Work Email</label>
+                  <input
+                    type="email"
+                    value={currentUser.email}
+                    disabled
+                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-400 bg-slate-50 cursor-not-allowed font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">System Access Role</label>
+                  <div className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 text-slate-600 font-bold rounded-xl text-xs flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-blue-500" />
+                    {currentUser.role}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Professional Skills</label>
+                  <input
+                    type="text"
+                    value={profileSkills}
+                    onChange={(e) => setProfileSkills(e.target.value)}
+                    placeholder="e.g. Next.js, agile, requirements design"
+                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 bg-white"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  Save Profile Info
+                </button>
+              </div>
+            </form>
+
+            {/* Change Password */}
+            <form onSubmit={handleSavePasswordChange} className="pt-6 space-y-4">
+              <div className="flex justify-between items-center pb-2">
+                <h2 className="text-base font-bold text-slate-900">Change System Password</h2>
+                {passSuccess && (
+                  <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                    <Check className="w-4.5 h-4.5" /> Password changed successfully!
+                  </span>
+                )}
+                {passError && (
+                  <span className="text-xs text-rose-600 font-bold">
+                    ⚠️ {passError}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Current Password</label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 bg-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 bg-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 bg-white"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  Update Password
+                </button>
+              </div>
+            </form>
+
+            {/* Notification Preferences */}
+            <form onSubmit={handleSaveNotifPrefs} className="pt-6 space-y-4">
+              <div className="pb-2">
+                <h2 className="text-base font-bold text-slate-900">Notification Preferences</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Toggle notification types you would like to receive in your dashboard feed and via email alerts.</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/50 transition-all select-none">
+                  <input
+                    type="checkbox"
+                    checked={notifEmailAlerts}
+                    onChange={(e) => setNotifEmailAlerts(e.target.checked)}
+                    className="rounded bg-white border-slate-300 text-blue-600 focus:ring-0 w-4 h-4 cursor-pointer"
+                  />
+                  <div>
+                    <span className="block text-xs font-bold text-slate-800">Email Alerts</span>
+                    <span className="block text-[10px] text-slate-400 font-medium">Forward all priority alerts directly to your registered email address</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/50 transition-all select-none">
+                  <input
+                    type="checkbox"
+                    checked={notifNewProject}
+                    onChange={(e) => setNotifNewProject(e.target.checked)}
+                    className="rounded bg-white border-slate-300 text-blue-600 focus:ring-0 w-4 h-4 cursor-pointer"
+                  />
+                  <div>
+                    <span className="block text-xs font-bold text-slate-800">New Project Alerts</span>
+                    <span className="block text-[10px] text-slate-400 font-medium">Receive notifications when a new enterprise workspace is initialized</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/50 transition-all select-none">
+                  <input
+                    type="checkbox"
+                    checked={notifTaskAssigned}
+                    onChange={(e) => setNotifTaskAssigned(e.target.checked)}
+                    className="rounded bg-white border-slate-300 text-blue-600 focus:ring-0 w-4 h-4 cursor-pointer"
+                  />
+                  <div>
+                    <span className="block text-xs font-bold text-slate-800">Task Assignments</span>
+                    <span className="block text-[10px] text-slate-400 font-medium">Receive alerts as soon as a story task is assigned or reassigned to you</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/50 transition-all select-none">
+                  <input
+                    type="checkbox"
+                    checked={notifReqUpdated}
+                    onChange={(e) => setNotifReqUpdated(e.target.checked)}
+                    className="rounded bg-white border-slate-300 text-blue-600 focus:ring-0 w-4 h-4 cursor-pointer"
+                  />
+                  <div>
+                    <span className="block text-xs font-bold text-slate-800">Requirement Updates</span>
+                    <span className="block text-[10px] text-slate-400 font-medium">Get notifications when specification parameters, user stories, or scope change</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/50 transition-all select-none">
+                  <input
+                    type="checkbox"
+                    checked={notifQaFeedback}
+                    onChange={(e) => setNotifQaFeedback(e.target.checked)}
+                    className="rounded bg-white border-slate-300 text-blue-600 focus:ring-0 w-4 h-4 cursor-pointer"
+                  />
+                  <div>
+                    <span className="block text-xs font-bold text-slate-800">QA Feedback & Audits</span>
+                    <span className="block text-[10px] text-slate-400 font-medium">Receive notifications when tasks fail QA audits or change baseline status</span>
+                  </div>
+                </label>
+              </div>
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  Save Notification Preferences
+                </button>
+              </div>
+            </form>
+
+            {/* Logout Panel */}
+            <div className="pt-6 space-y-4">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Revoke Session & Exit</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Securely clear your active project session parameters and logout from the system environment.</p>
+              </div>
+              <div className="flex">
+                <button
+                  type="button"
+                  onClick={handleTriggerLogout}
+                  className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-5 py-3 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer uppercase tracking-wider"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout from Session</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'company' && (
           <form onSubmit={handleSaveSettings} className="p-6 space-y-6">
             <div className="space-y-4">

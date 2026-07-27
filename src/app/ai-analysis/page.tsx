@@ -15,6 +15,7 @@ export default function AiAnalysisPage() {
   const tasks = useProjectStore((state) => state.tasks);
   const addTask = useProjectStore((state) => state.addTask);
   const settings = useProjectStore((state) => state.settings);
+  const currentUser = useProjectStore((state) => state.currentUser);
 
   // States
   const [activeTab, setActiveTab] = useState<'notes' | 'quality' | 'suitability' | 'srs'>('notes');
@@ -258,29 +259,32 @@ export default function AiAnalysisPage() {
               <textarea
                 value={meetingNotes}
                 onChange={(e) => setMeetingNotes(e.target.value)}
+                readOnly={currentUser?.role === 'CEO'}
                 placeholder="Paste notes here..."
                 rows={8}
-                className="w-full text-xs font-mono p-4 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white"
+                className="w-full text-xs font-mono p-4 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white disabled:opacity-80"
               />
 
               <div className="flex justify-end gap-3">
-                <button
-                  onClick={handleExtractRequirements}
-                  disabled={isExtracting || !meetingNotes.trim()}
-                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
-                >
-                  {isExtracting ? (
-                    <>
-                      <RotateCw className="w-4 h-4 animate-spin" />
-                      <span>Parsing Notes...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" />
-                      <span>Extract Backlog Items</span>
-                    </>
-                  )}
-                </button>
+                {currentUser?.role !== 'CEO' && (
+                  <button
+                    onClick={handleExtractRequirements}
+                    disabled={isExtracting || !meetingNotes.trim()}
+                    className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    {isExtracting ? (
+                      <>
+                        <RotateCw className="w-4 h-4 animate-spin" />
+                        <span>Parsing Notes...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>Extract Backlog Items</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -336,13 +340,15 @@ export default function AiAnalysisPage() {
                 </div>
 
                 <div className="flex justify-end pt-4 border-t border-slate-200">
-                  <button
-                    onClick={handleImportToBacklog}
-                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Import to Project Backlogs</span>
-                  </button>
+                  {currentUser?.role === 'Business Analyst' && (
+                    <button
+                      onClick={handleImportToBacklog}
+                      className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Import to Project Backlogs</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -427,7 +433,7 @@ export default function AiAnalysisPage() {
                     </div>
                   </div>
 
-                  {selectedReq.completeness < 95 && (
+                  {selectedReq.completeness < 95 && currentUser?.role !== 'CEO' && (
                     <button
                       onClick={() => handleAutoFixClarity(selectedReq.id)}
                       className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"

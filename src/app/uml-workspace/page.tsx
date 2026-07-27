@@ -260,23 +260,25 @@ export default function UmlWorkspacePage() {
         </div>
 
         <div className="flex flex-wrap gap-2.5">
-          <button
-            onClick={handleAiGenerate}
-            disabled={isGenerating}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/10 cursor-pointer disabled:opacity-50"
-          >
-            {isGenerating ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>AI Engineering...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 text-white" />
-                <span>Generate from Specs</span>
-              </>
-            )}
-          </button>
+          {currentUser?.role !== 'CEO' && (
+            <button
+              onClick={handleAiGenerate}
+              disabled={isGenerating}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/10 cursor-pointer disabled:opacity-50"
+            >
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>AI Engineering...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-white" />
+                  <span>Generate from Specs</span>
+                </>
+              )}
+            </button>
+          )}
           
           <button
             onClick={() => setShowExportModal(true)}
@@ -286,13 +288,15 @@ export default function UmlWorkspacePage() {
             <span>Export Code</span>
           </button>
 
-          <button
-            onClick={() => setShowCommitModal(true)}
-            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer"
-          >
-            <ShieldCheck className="w-4.5 h-4.5 text-teal-400" />
-            <span>Commit Snapshot</span>
-          </button>
+          {currentUser?.role !== 'CEO' && (
+            <button
+              onClick={() => setShowCommitModal(true)}
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            >
+              <ShieldCheck className="w-4.5 h-4.5 text-teal-400" />
+              <span>Commit Snapshot</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -335,20 +339,22 @@ export default function UmlWorkspacePage() {
                 Live Design Canvas
               </span>
               
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowAddClassModal(true)}
-                  className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white rounded-lg px-2.5 py-1.5 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Class
-                </button>
-                <button
-                  onClick={() => setShowAddRelModal(true)}
-                  className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white rounded-lg px-2.5 py-1.5 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Relationship
-                </button>
-              </div>
+              {currentUser?.role === 'Business Analyst' && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowAddClassModal(true)}
+                    className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white rounded-lg px-2.5 py-1.5 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Class
+                  </button>
+                  <button
+                    onClick={() => setShowAddRelModal(true)}
+                    className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white rounded-lg px-2.5 py-1.5 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Relationship
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Visual Class Card Grid */}
@@ -367,22 +373,24 @@ export default function UmlWorkspacePage() {
                     {/* Header */}
                     <div className="px-4 py-3 bg-slate-950/80 border-b border-slate-800 flex justify-between items-center">
                       <span className="font-extrabold text-xs text-white tracking-wide uppercase">{cls.name}</span>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => openEditClassModal(cls)}
-                          className="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded transition-colors cursor-pointer"
-                          title="Edit Class attributes & methods"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={() => deleteUmlClass(cls.id)}
-                          className="p-1 hover:bg-slate-800 text-rose-400 rounded transition-colors cursor-pointer"
-                          title="Delete class"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
+                      {currentUser?.role === 'Business Analyst' && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => openEditClassModal(cls)}
+                            className="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded transition-colors cursor-pointer"
+                            title="Edit Class attributes & methods"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => deleteUmlClass(cls.id)}
+                            className="p-1 hover:bg-slate-800 text-rose-400 rounded transition-colors cursor-pointer"
+                            title="Delete class"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     {/* Attributes */}
                     <div className="p-3 border-b border-slate-800/50 space-y-1">
@@ -446,13 +454,15 @@ export default function UmlWorkspacePage() {
                             {rel.type}
                           </span>
                         </div>
-                        <button
-                          onClick={() => deleteUmlRelationship(rel.id)}
-                          className="text-slate-400 hover:text-rose-600 p-1 hover:bg-slate-100 rounded transition-colors cursor-pointer shrink-0"
-                          title="Remove link"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {currentUser?.role === 'Business Analyst' && (
+                          <button
+                            onClick={() => deleteUmlRelationship(rel.id)}
+                            className="text-slate-400 hover:text-rose-600 p-1 hover:bg-slate-100 rounded transition-colors cursor-pointer shrink-0"
+                            title="Remove link"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     );
                   })}
@@ -460,13 +470,15 @@ export default function UmlWorkspacePage() {
               )}
             </div>
 
-            <button
-              onClick={() => setShowAddRelModal(true)}
-              className="w-full flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-3 text-xs font-bold transition-all shadow-xs cursor-pointer mt-4 shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Relationship</span>
-            </button>
+            {currentUser?.role === 'Business Analyst' && (
+              <button
+                onClick={() => setShowAddRelModal(true)}
+                className="w-full flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-3 text-xs font-bold transition-all shadow-xs cursor-pointer mt-4 shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Relationship</span>
+              </button>
+            )}
           </div>
         </div>
       ) : (

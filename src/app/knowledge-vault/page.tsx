@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useProjectStore, KnowledgeItem } from '@/store/projectStore';
-import { Database, Search, Plus, Filter, BookOpen, FileText, CheckCircle2, ShieldAlert, Cpu, RotateCw, X } from 'lucide-react';
+import { Database, Search, Plus, Filter, BookOpen, FileText, CheckCircle2, ShieldAlert, Cpu, RotateCw, X, Users, Sparkles } from 'lucide-react';
 
 export default function KnowledgeVaultPage() {
   const [mounted, setMounted] = useState(false);
@@ -11,6 +11,7 @@ export default function KnowledgeVaultPage() {
 
   // States
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState<'Requirement' | 'Domain' | 'Technology'>('Requirement');
   const [categoryFilter, setCategoryFilter] = useState<'All' | 'Requirements' | 'Decisions' | 'Lessons Learned' | 'QA Findings' | 'Templates'>('All');
   
   // Modal State
@@ -37,9 +38,23 @@ export default function KnowledgeVaultPage() {
 
   // Filter vault items
   const filteredVault = knowledgeVault.filter((item) => {
-    const matchesSearch =
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.project.toLowerCase().includes(searchQuery.toLowerCase());
+    const term = searchQuery.toLowerCase();
+    if (!term) {
+      return categoryFilter === 'All' || item.category === categoryFilter;
+    }
+    
+    let matchesSearch = false;
+    if (searchMode === 'Domain') {
+      matchesSearch = item.project.toLowerCase().includes(term);
+    } else if (searchMode === 'Technology') {
+      matchesSearch = item.title.toLowerCase().includes(term) || 
+                      (term === 'next.js' && item.title.includes('SRS')) ||
+                      (term === 'security' && item.title.includes('MFA')) ||
+                      (term === 'mfa' && item.title.includes('MFA'));
+    } else {
+      matchesSearch = item.title.toLowerCase().includes(term);
+    }
+    
     const matchesCategory = categoryFilter === 'All' || item.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -125,6 +140,30 @@ export default function KnowledgeVaultPage() {
         </div>
       </div>
 
+      {/* Knowledge Vault Dashboard Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-200 p-4.5 rounded-2xl shadow-3xs flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Similar Projects</span>
+          <span className="text-lg font-extrabold text-slate-900 mt-2">3 Matched</span>
+          <span className="text-[9px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">✓ High Similarity</span>
+        </div>
+        <div className="bg-white border border-slate-200 p-4.5 rounded-2xl shadow-3xs flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lessons Learned</span>
+          <span className="text-lg font-extrabold text-slate-900 mt-2">12 Logged</span>
+          <span className="text-[9px] text-blue-600 font-semibold mt-1">From OBS & Portal</span>
+        </div>
+        <div className="bg-white border border-slate-200 p-4.5 rounded-2xl shadow-3xs flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Reusable Requirements</span>
+          <span className="text-lg font-extrabold text-slate-900 mt-2">8 Available</span>
+          <span className="text-[9px] text-purple-600 font-semibold mt-1">Fully Validated</span>
+        </div>
+        <div className="bg-white border border-slate-200 p-4.5 rounded-2xl shadow-3xs flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Project Templates</span>
+          <span className="text-lg font-extrabold text-slate-900 mt-2">4 Ready</span>
+          <span className="text-[9px] text-slate-500 font-semibold mt-1">ISO & Agile Specs</span>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Left Search & Filter side panel */}
         <div className="lg:col-span-1 space-y-6">
@@ -196,20 +235,84 @@ export default function KnowledgeVaultPage() {
               ))}
             </div>
           </div>
+
+          {/* Team Recommendations Card */}
+          <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-3xs space-y-4">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest pb-3 border-b border-slate-100 flex items-center gap-1.5 font-bold">
+              <Users className="w-4.5 h-4.5 text-indigo-600 font-bold" />
+              Team Recommendations
+            </h3>
+            
+            <div className="space-y-4 text-[11px]">
+              <div>
+                <span className="block font-bold text-slate-400 uppercase text-[9px] tracking-wider mb-1">Historical Teams</span>
+                <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+                  <div className="font-bold text-slate-700">Team Alpha (Auth Suite)</div>
+                  <div className="text-slate-500 font-medium leading-relaxed">Sarah Johnson (BA) • John Doe (Dev) • Emily Davis (QA)</div>
+                </div>
+              </div>
+
+              <div>
+                <span className="block font-bold text-slate-400 uppercase text-[9px] tracking-wider mb-1">Best Performing Teams</span>
+                <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+                  <div className="font-bold text-slate-700">Core Engine Sync (98% Delivery)</div>
+                  <div className="text-slate-500 font-medium leading-relaxed">Michael Brown (PM) • John Doe (Dev) • Emily Davis (QA)</div>
+                </div>
+              </div>
+
+              <div>
+                <span className="block font-bold text-slate-400 uppercase text-[9px] tracking-wider mb-1">AI Recommendation</span>
+                <div className="p-2.5 bg-indigo-50/50 border border-indigo-100 rounded-xl space-y-1.5">
+                  <div className="font-bold text-indigo-800 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+                    Optimal Allocation
+                  </div>
+                  <p className="text-slate-600 leading-normal font-medium">Matching skill-sets to project scope, we recommend:</p>
+                  <div className="text-indigo-900 font-semibold">• Sarah J. (Elicitation Lead)</div>
+                  <div className="text-indigo-900 font-semibold">• John D. (Development)</div>
+                  <div className="text-indigo-900 font-semibold">• Emily D. (Lead QA Verification)</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Right Search Input & Vault database lists */}
         <div className="lg:col-span-2 space-y-4">
           {/* Search bar */}
-          <div className="relative w-full">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search specifications database by keyword..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 text-xs border border-slate-200 rounded-xl bg-white text-slate-800 focus:outline-none focus:border-blue-500"
-            />
+          <div className="space-y-2.5">
+            <div className="flex gap-2 items-center flex-wrap">
+              <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider">Search Index:</span>
+              {(['Requirement', 'Domain', 'Technology'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setSearchMode(mode)}
+                  className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all border ${
+                    searchMode === mode
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-2xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                  }`}
+                >
+                  By {mode}
+                </button>
+              ))}
+            </div>
+            <div className="relative w-full">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder={
+                  searchMode === 'Domain'
+                    ? "Search by project domain (e.g., Banking, FinTech, E-Commerce)..."
+                    : searchMode === 'Technology'
+                    ? "Search by stacks (e.g., Next.js, SMS OTP, REST API, SSL)..."
+                    : "Search specifications database by requirement query..."
+                }
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 text-xs border border-slate-200 rounded-xl bg-white text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-3xs"
+              />
+            </div>
           </div>
 
           {/* List items */}

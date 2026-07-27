@@ -12,13 +12,13 @@ const rolePaths: Record<string, string[]> = {
   '/requirements': ['Project Manager', 'Business Analyst', 'Stakeholder'],
   '/user-stories': ['Project Manager', 'Business Analyst'],
   '/tasks': ['Project Manager', 'Developer', 'QA Engineer'],
-  '/uml-workspace': ['Business Analyst'],
+  '/uml-workspace': ['Business Analyst', 'Project Manager', 'CEO'],
   '/approvals': ['CEO', 'Project Manager', 'Business Analyst', 'Stakeholder'],
   '/baselines': ['CEO', 'Project Manager', 'Stakeholder'],
   '/traceability': ['Business Analyst', 'Developer', 'QA Engineer'],
-  '/ai-analysis': ['Business Analyst'],
+  '/ai-analysis': ['Business Analyst', 'Project Manager', 'CEO'],
   '/reports': ['CEO', 'Project Manager', 'QA Engineer', 'Stakeholder'],
-  '/knowledge-vault': ['CEO', 'Business Analyst'],
+  '/knowledge-vault': ['CEO', 'Project Manager', 'Business Analyst'],
 };
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
