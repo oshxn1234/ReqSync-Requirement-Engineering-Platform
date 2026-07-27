@@ -23,6 +23,20 @@ import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { useProjectStore } from '@/store/projectStore';
 
+const rolePaths: Record<string, string[]> = {
+  '/user-management': ['CEO', 'Project Manager'],
+  '/requirements': ['Project Manager', 'Business Analyst', 'Stakeholder'],
+  '/user-stories': ['Project Manager', 'Business Analyst'],
+  '/tasks': ['Project Manager', 'Developer', 'QA Engineer'],
+  '/uml-workspace': ['Business Analyst'],
+  '/approvals': ['CEO', 'Project Manager', 'Business Analyst', 'Stakeholder'],
+  '/baselines': ['CEO', 'Project Manager', 'Stakeholder'],
+  '/traceability': ['Business Analyst', 'Developer', 'QA Engineer'],
+  '/ai-analysis': ['Business Analyst'],
+  '/reports': ['CEO', 'Project Manager', 'QA Engineer', 'Stakeholder'],
+  '/knowledge-vault': ['CEO', 'Business Analyst'],
+};
+
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Requirements', href: '/requirements', icon: FileText },
@@ -34,6 +48,7 @@ const navItems = [
   { name: 'Traceability', href: '/traceability', icon: GitMerge },
   { name: 'AI Analysis', href: '/ai-analysis', icon: BrainCircuit },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
+  { name: 'User Management', href: '/user-management', icon: UserCog },
   { name: 'Knowledge Vault', href: '/knowledge-vault', icon: Database },
   { name: 'Project Settings', href: '/settings', icon: Settings },
 ];
@@ -64,15 +79,13 @@ export default function Sidebar() {
     );
   }
 
-  // If user is CEO or Project Manager, add User Management route
-  const isAuthorizedToManageUsers = currentUser?.role === 'Project Manager' || currentUser?.role === 'CEO';
-  const displayedNavItems = isAuthorizedToManageUsers
-    ? [
-        ...navItems.slice(0, 10),
-        { name: 'User Management', href: '/user-management', icon: UserCog },
-        ...navItems.slice(10),
-      ]
-    : navItems;
+  // Filter navigation items by role
+  const displayedNavItems = navItems.filter((item) => {
+    if (item.href === '/dashboard' || item.href === '/settings') return true;
+    const allowedRoles = rolePaths[item.href];
+    if (!allowedRoles) return true;
+    return currentUser && allowedRoles.includes(currentUser.role);
+  });
 
   return (
     <aside className={cn("bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 text-slate-300 transition-all duration-300 relative", isSidebarOpen ? "w-64" : "w-20")}>

@@ -226,6 +226,7 @@ export default function UserManagement() {
                   <option value="Business Analyst">Business Analyst</option>
                   <option value="Developer">Developer</option>
                   <option value="QA Engineer">QA Engineer</option>
+                  <option value="Stakeholder">Stakeholder / Client</option>
                 </select>
               </div>
 
@@ -301,6 +302,7 @@ export default function UserManagement() {
                         <option value="Business Analyst">Business Analyst</option>
                         <option value="Developer">Developer</option>
                         <option value="QA Engineer">QA Engineer</option>
+                        <option value="Stakeholder">Stakeholder / Client</option>
                       </select>
                     </div>
 

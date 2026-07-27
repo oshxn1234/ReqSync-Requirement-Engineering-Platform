@@ -113,7 +113,7 @@ export interface AppUser {
   name: string;
   email: string;
   password?: string;
-  role: 'CEO' | 'Project Manager' | 'Business Analyst' | 'Developer' | 'QA Engineer';
+  role: 'CEO' | 'Project Manager' | 'Business Analyst' | 'Developer' | 'QA Engineer' | 'Stakeholder';
   skills?: string;
 }
 
@@ -187,6 +187,14 @@ export const useProjectStore = create<ProjectState>()(
     (set) => ({
       users: [
         {
+          id: 'USR-000',
+          name: 'Chief Executive Officer',
+          email: 'ceo@company.com',
+          password: 'password123',
+          role: 'CEO',
+          skills: 'Executive Management, Business Strategy, Corporate Governance'
+        },
+        {
           id: 'USR-001',
           name: 'Michael Brown',
           email: 'michael.b@company.com',
@@ -217,6 +225,14 @@ export const useProjectStore = create<ProjectState>()(
           password: 'password123',
           role: 'QA Engineer',
           skills: 'Unit Testing, E2E Testing, Automation, Security Auditing'
+        },
+        {
+          id: 'USR-005',
+          name: 'Alice Smith',
+          email: 'client@external.com',
+          password: 'password123',
+          role: 'Stakeholder',
+          skills: 'Business Requirements, Project Alignment, Executive Sponsor'
         }
       ],
       currentUser: null,
@@ -696,10 +712,12 @@ export const useProjectStore = create<ProjectState>()(
         endDate: '2026-12-31',
         status: 'In Progress',
         teamMembers: [
+          { name: 'Chief Executive Officer', role: 'CEO', email: 'ceo@company.com', skills: 'Executive Management, Business Strategy, Corporate Governance' },
           { name: 'Sarah Johnson', role: 'Lead Business Analyst', email: 'sarah.j@company.com', skills: 'Requirements Elicitation, SRS Design, Business Analysis' },
           { name: 'John Doe', role: 'Senior Developer', email: 'john.d@company.com', skills: 'Next.js, React, Zustand, REST APIs, Cryptography' },
           { name: 'Michael Brown', role: 'Product Manager', email: 'michael.b@company.com', skills: 'Roadmapping, Agile, Backlog Grooming, QA Coordination' },
-          { name: 'Emily Davis', role: 'QA Engineer', email: 'emily.d@company.com', skills: 'Unit Testing, E2E Testing, Automation, Security Auditing' }
+          { name: 'Emily Davis', role: 'QA Engineer', email: 'emily.d@company.com', skills: 'Unit Testing, E2E Testing, Automation, Security Auditing' },
+          { name: 'Alice Smith', role: 'Stakeholder / Client', email: 'client@external.com', skills: 'Business Requirements, Project Alignment, Executive Sponsor' }
         ],
         companyName: 'Apex Financial Technologies LLC',
         companyRegNumber: 'TX-98218-A',
@@ -864,10 +882,81 @@ export const useProjectStore = create<ProjectState>()(
       login: (email, password) => {
         let success = false;
         set((state) => {
-          const user = state.users.find(
+          // Try to find the user in the current state
+          let user = state.users.find(
             (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
           );
-          if (user) {
+
+          // If not found (often due to outdated persisted state in browser localstorage),
+          // check if it's one of the seeded accounts and inject it.
+          if (!user) {
+            const seedUsers = [
+              {
+                id: 'USR-000',
+                name: 'Chief Executive Officer',
+                email: 'ceo@company.com',
+                password: 'password123',
+                role: 'CEO' as const,
+                skills: 'Executive Management, Business Strategy, Corporate Governance'
+              },
+              {
+                id: 'USR-001',
+                name: 'Michael Brown',
+                email: 'michael.b@company.com',
+                password: 'password123',
+                role: 'Project Manager' as const,
+                skills: 'Roadmapping, Agile, Backlog Grooming, QA Coordination'
+              },
+              {
+                id: 'USR-002',
+                name: 'Sarah Johnson',
+                email: 'sarah.j@company.com',
+                password: 'password123',
+                role: 'Business Analyst' as const,
+                skills: 'Requirements Elicitation, SRS Design, Business Analysis'
+              },
+              {
+                id: 'USR-003',
+                name: 'John Doe',
+                email: 'john.d@company.com',
+                password: 'password123',
+                role: 'Developer' as const,
+                skills: 'Next.js, React, Zustand, REST APIs, Cryptography'
+              },
+              {
+                id: 'USR-004',
+                name: 'Emily Davis',
+                email: 'emily.d@company.com',
+                password: 'password123',
+                role: 'QA Engineer' as const,
+                skills: 'Unit Testing, E2E Testing, Automation, Security Auditing'
+              },
+              {
+                id: 'USR-005',
+                name: 'Alice Smith',
+                email: 'client@external.com',
+                password: 'password123',
+                role: 'Stakeholder' as const,
+                skills: 'Business Requirements, Project Alignment, Executive Sponsor'
+              }
+            ];
+
+            const match = seedUsers.find(
+              (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
+            );
+
+            if (match) {
+              const updatedUsers = [...state.users];
+              if (!updatedUsers.some(u => u.email.toLowerCase() === match.email.toLowerCase())) {
+                updatedUsers.push(match);
+              }
+              success = true;
+              return {
+                users: updatedUsers,
+                currentUser: match
+              };
+            }
+          } else {
             success = true;
             return { currentUser: user };
           }

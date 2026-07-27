@@ -67,10 +67,22 @@ export default function Tasks() {
   
   // Simulation Helper: Lets the user simulate being a Developer or QA Engineer to test both workflows
   const [simulatedRole, setSimulatedRole] = useState<'Developer' | 'QA Engineer'>('Developer');
+  const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      setSimulatedRole(currentUser.role === 'QA Engineer' ? 'QA Engineer' : 'Developer');
+      if (currentUser.role === 'Developer' || currentUser.role === 'QA Engineer') {
+        setShowMyTasksOnly(true);
+      } else {
+        setShowMyTasksOnly(false);
+      }
+    }
+  }, [currentUser]);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
@@ -99,7 +111,16 @@ export default function Tasks() {
     const matchesStatus = statusFilter === 'All' || task.status === statusFilter;
     const matchesPriority = priorityFilter === 'All' || task.priority === priorityFilter;
     
-    return matchesSearch && matchesStatus && matchesPriority;
+    let matchesAssignee = true;
+    if (showMyTasksOnly && currentUser) {
+      if (currentUser.role === 'Developer') {
+        matchesAssignee = task.assignee.toLowerCase().includes(currentUser.name.split(' ')[0].toLowerCase());
+      } else if (currentUser.role === 'QA Engineer') {
+        matchesAssignee = task.status === 'Ready for QA';
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesPriority && matchesAssignee;
   });
 
   const onSubmit = (data: TaskFormValues) => {
@@ -169,17 +190,19 @@ export default function Tasks() {
               <p className="text-xs text-slate-500">Development and testing tasks mapped to requirements flow</p>
             </div>
             
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Task</span>
-            </button>
+            {currentUser && (currentUser.role === 'Project Manager' || currentUser.role === 'CEO') && (
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Task</span>
+              </button>
+            )}
           </div>
 
           {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pb-6 border-b border-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pb-6 border-b border-slate-100">
             {/* Search */}
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -219,6 +242,25 @@ export default function Tasks() {
                 <option value="Medium">Medium</option>
                 <option value="Low">Low</option>
               </select>
+            </div>
+
+            {/* Role-based Filter Checkbox */}
+            <div className="flex items-center">
+              {currentUser && (currentUser.role === 'Developer' || currentUser.role === 'QA Engineer') ? (
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 font-semibold select-none bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl w-full h-full">
+                  <input
+                    type="checkbox"
+                    checked={showMyTasksOnly}
+                    onChange={(e) => setShowMyTasksOnly(e.target.checked)}
+                    className="rounded bg-white border-slate-300 text-blue-600 focus:ring-0 w-4 h-4 cursor-pointer"
+                  />
+                  <span className="truncate">{currentUser.role === 'Developer' ? 'Assigned to Me' : 'Ready for QA'}</span>
+                </label>
+              ) : (
+                <div className="w-full text-slate-400 text-xs italic flex items-center justify-center border border-dashed border-slate-200 rounded-xl py-2">
+                  No role-specific filtering
+                </div>
+              )}
             </div>
           </div>
 

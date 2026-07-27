@@ -175,32 +175,52 @@ export default function LoginPage() {
 
           <div className="grid grid-cols-2 gap-2">
             <button
+              type="button"
+              onClick={() => handleQuickFill('ceo@company.com')}
+              className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
+            >
+              <span className="font-bold text-white">Chief Executive</span>
+              <span className="text-rose-400 font-medium">CEO</span>
+            </button>
+            <button
+              type="button"
               onClick={() => handleQuickFill('michael.b@company.com')}
-              className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
+              className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
             >
               <span className="font-bold text-white">Michael Brown</span>
               <span className="text-blue-400 font-medium">Project Manager</span>
             </button>
             <button
+              type="button"
               onClick={() => handleQuickFill('sarah.j@company.com')}
-              className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
+              className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
             >
               <span className="font-bold text-white">Sarah Johnson</span>
               <span className="text-amber-400 font-medium">Business Analyst</span>
             </button>
             <button
+              type="button"
               onClick={() => handleQuickFill('john.d@company.com')}
-              className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
+              className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
             >
               <span className="font-bold text-white">John Doe</span>
               <span className="text-emerald-400 font-medium">Developer</span>
             </button>
             <button
+              type="button"
               onClick={() => handleQuickFill('emily.d@company.com')}
-              className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
+              className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
             >
               <span className="font-bold text-white">Emily Davis</span>
               <span className="text-purple-400 font-medium">QA Engineer</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickFill('client@external.com')}
+              className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
+            >
+              <span className="font-bold text-white">Alice Smith</span>
+              <span className="text-teal-400 font-medium">Stakeholder</span>
             </button>
           </div>
         </div>
