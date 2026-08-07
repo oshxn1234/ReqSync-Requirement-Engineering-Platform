@@ -83,7 +83,13 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>net.sourceforge.plantuml</groupId>
+			<artifactId>plantuml</artifactId>
+			<version>1.2026.6</version>
+		</dependency>
 	</dependencies>
+
 
 	<build>
 		<plugins>
