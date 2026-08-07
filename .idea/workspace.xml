@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="6cd184bf-fc08-4ddf-af27-e6c93b0f37c2" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlEditRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlGenerationRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlGenerationResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/RequirementForUml.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/UmlDiagramSummaryResponse.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/reqsync-backend/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/ReqsyncBackendApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/ReqsyncBackendApplication.java" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 3
+}</component>
+  <component name="ProjectId" id="3HZzXSuDNGCxtVva0BQdZi9UU7V" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Application.ReqSync Backend.executor": "Run",
+    "Application.reqsync_backend.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "uml-class-diagram-generation",
+    "ignore.virus.scanning.warn.message": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Users/Administrator/Desktop/ReqSync-Requirement-Engineering-Platform"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\Administrator\Desktop\ReqSync-Requirement-Engineering-Platform\reqsync-backend\src\main\java\com\reqsync\reqsync_backend\uml" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration name="ReqSync Backend" type="Application" factoryName="Application">
+      <option name="ALTERNATIVE_JRE_PATH" value="21" />
+      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+      <option name="MAIN_CLASS_NAME" value="ReqsyncBackendApplication" />
+      <option name="PROGRAM_PARAMETERS" value="$MODULE_DIR$" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="JetRunConfigurationType">
+      <module name="ReqSync-Requirement-Engineering-Platform" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="ReqSync-Requirement-Engineering-Platform" />
+      <option name="filePath" />
+      <method v="2" />
+    </configuration>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="6cd184bf-fc08-4ddf-af27-e6c93b0f37c2" name="Changes" comment="" />
+      <created>1786090417606</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1786090417606</updated>
+    </task>
+    <servers />
+  </component>
+</project>
