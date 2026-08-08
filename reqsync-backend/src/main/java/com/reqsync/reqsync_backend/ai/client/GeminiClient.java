@@ -17,106 +17,53 @@ public class GeminiClient {
 
     public GeminiClient(
             RestClient.Builder builder,
-
-            @Value("${gemini.api-key}")
-            String apiKey,
-
-            @Value("${gemini.base-url}")
-            String baseUrl,
-
-            @Value("${gemini.model}")
-            String model
+            @Value("${gemini.api-key}") String apiKey,
+            @Value("${gemini.base-url}") String baseUrl,
+            @Value("${gemini.model}") String model
     ) {
-
         this.model = model;
 
-        this.restClient =
-                builder
-                        .baseUrl(baseUrl)
-                        .defaultHeader(
-                                "x-goog-api-key",
-                                apiKey
-                        )
-                        .build();
+        this.restClient = builder
+                .baseUrl(baseUrl)
+                .defaultHeader("x-goog-api-key", apiKey)
+                .build();
     }
 
     public String generateText(String prompt) {
 
-        Map<String, Object> requestBody =
-                Map.of(
-
-                        "contents",
-                        List.of(
-                                Map.of(
-                                        "role",
-                                        "user",
-
-                                        "parts",
-                                        List.of(
-                                                Map.of(
-                                                        "text",
-                                                        prompt
-                                                )
-                                        )
-                                )
-                        ),
-
-                        "generationConfig",
+        Map<String, Object> requestBody = Map.of(
+                "contents", List.of(
                         Map.of(
-                                "temperature",
-                                0.1,
+                                "parts", List.of(
+                                        Map.of("text", prompt)
+                                )
+                        )
+                )
+        );
 
-                                "maxOutputTokens",
-                                4096
-                        )
-                );
-
-        JsonNode response =
-                restClient
-                        .post()
-                        .uri(
-                                "/models/{model}:generateContent",
-                                model
-                        )
-                        .contentType(
-                                MediaType.APPLICATION_JSON
-                        )
-                        .body(requestBody)
-                        .retrieve()
-                        .body(JsonNode.class);
+        JsonNode response = restClient
+                .post()
+                .uri("/models/{model}:generateContent", model)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestBody)
+                .retrieve()
+                .body(JsonNode.class);
 
         if (response == null) {
-            throw new RuntimeException(
-                    "Gemini API returned an empty response."
-            );
+            throw new RuntimeException("Empty response from Gemini API");
         }
 
-        JsonNode candidates =
-                response.path("candidates");
+        String text = response
+                .path("candidates")
+                .path(0)
+                .path("content")
+                .path("parts")
+                .path(0)
+                .path("text")
+                .asText();
 
-        if (!candidates.isArray()
-                || candidates.size() == 0) {
-
-            throw new RuntimeException(
-                    "Gemini API returned no candidates."
-            );
-        }
-
-        String text =
-                candidates
-                        .path(0)
-                        .path("content")
-                        .path("parts")
-                        .path(0)
-                        .path("text")
-                        .asText();
-
-        if (text == null
-                || text.isBlank()) {
-
-            throw new RuntimeException(
-                    "Gemini returned empty diagram content."
-            );
+        if (text.isBlank()) {
+            throw new RuntimeException("Gemini returned empty content");
         }
 
         return text;

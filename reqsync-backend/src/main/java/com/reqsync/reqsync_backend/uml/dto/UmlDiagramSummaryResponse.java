@@ -7,17 +7,11 @@ import java.time.LocalDateTime;
 public record UmlDiagramSummaryResponse(
 
         Long diagramId,
-
         Long projectId,
-
-        String diagramName,
-
+        String name,
         DiagramStatus status,
-
         Integer currentVersion,
-
         LocalDateTime createdAt,
-
         LocalDateTime updatedAt
 
 ) {

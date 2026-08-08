@@ -1,13 +1,24 @@
 package com.reqsync.reqsync_backend.uml.service;
 
 import com.reqsync.reqsync_backend.ai.client.GeminiClient;
+
 import com.reqsync.reqsync_backend.uml.dto.RequirementForUml;
 import com.reqsync.reqsync_backend.uml.dto.UmlDiagramSummaryResponse;
 import com.reqsync.reqsync_backend.uml.dto.UmlEditRequest;
 import com.reqsync.reqsync_backend.uml.dto.UmlGenerationRequest;
 import com.reqsync.reqsync_backend.uml.dto.UmlGenerationResponse;
+
+import com.reqsync.reqsync_backend.uml.entity.ClassDiagram;
 import com.reqsync.reqsync_backend.uml.entity.ClassDiagramVersion;
+
+import com.reqsync.reqsync_backend.uml.enums.DiagramSource;
+import com.reqsync.reqsync_backend.uml.enums.DiagramStatus;
+
+import com.reqsync.reqsync_backend.uml.repository.ClassDiagramRepository;
+import com.reqsync.reqsync_backend.uml.repository.ClassDiagramVersionRepository;
+
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -20,22 +31,31 @@ public class UmlGenerationService {
     private final PlantUmlSanitizer plantUmlSanitizer;
     private final PlantUmlRenderService plantUmlRenderService;
 
+    private final ClassDiagramRepository diagramRepository;
+    private final ClassDiagramVersionRepository versionRepository;
+
+
     public UmlGenerationService(
             GeminiClient geminiClient,
             PlantUmlSanitizer plantUmlSanitizer,
-            PlantUmlRenderService plantUmlRenderService
+            PlantUmlRenderService plantUmlRenderService,
+            ClassDiagramRepository diagramRepository,
+            ClassDiagramVersionRepository versionRepository
     ) {
+
         this.geminiClient = geminiClient;
         this.plantUmlSanitizer = plantUmlSanitizer;
         this.plantUmlRenderService = plantUmlRenderService;
+        this.diagramRepository = diagramRepository;
+        this.versionRepository = versionRepository;
     }
 
-    /*
-     * ============================================================
-     * 1. GENERATE UML DIAGRAM
-     * ============================================================
-     */
 
+    // =========================================================
+    // GENERATE UML + SAVE TO DATABASE
+    // =========================================================
+
+    @Transactional
     public UmlGenerationResponse generate(
             UmlGenerationRequest request
     ) {
@@ -46,10 +66,16 @@ public class UmlGenerationService {
             );
         }
 
-        String prompt = buildPrompt(request);
 
+        // Build prompt
+        String prompt =
+                buildPrompt(request);
+
+
+        // Call Gemini
         String generatedPlantUml =
                 geminiClient.generateText(prompt);
+
 
         if (generatedPlantUml == null ||
                 generatedPlantUml.isBlank()) {
@@ -59,69 +85,158 @@ public class UmlGenerationService {
             );
         }
 
+
+        // Clean PlantUML
         String sanitizedPlantUml =
                 plantUmlSanitizer.sanitize(
                         generatedPlantUml
                 );
 
+
+        // Render UML to SVG
         String svg =
                 plantUmlRenderService.renderToSvg(
                         sanitizedPlantUml
                 );
 
+
+        // Convert SVG to Base64
         String svgBase64 =
-                Base64.getEncoder().encodeToString(
-                        svg.getBytes(StandardCharsets.UTF_8)
-                );
+                Base64.getEncoder()
+                        .encodeToString(
+                                svg.getBytes(
+                                        StandardCharsets.UTF_8
+                                )
+                        );
+
+
+        // ==========================================
+        // SAVE MAIN DIAGRAM
+        // ==========================================
+
+        ClassDiagram diagram =
+                ClassDiagram.builder()
+                        .projectId(
+                                request.projectId()
+                        )
+                        .name(
+                                request.projectName()
+                                        + " Class Diagram"
+                        )
+                        .status(
+                                DiagramStatus.DRAFT
+                        )
+                        .currentVersion(1)
+                        .build();
+
+
+        diagram =
+                diagramRepository.save(diagram);
+
+
+        // ==========================================
+        // SAVE VERSION 1
+        // ==========================================
+
+        ClassDiagramVersion version =
+                ClassDiagramVersion.builder()
+                        .diagramId(
+                                diagram.getId()
+                        )
+                        .versionNumber(1)
+                        .plantUmlCode(
+                                sanitizedPlantUml
+                        )
+                        .source(
+                                DiagramSource.AI
+                        )
+                        .build();
+
+
+        versionRepository.save(version);
+
+
+        // ==========================================
+        // RETURN RESPONSE
+        // ==========================================
 
         return new UmlGenerationResponse(
-                null,
+                diagram.getId(),
                 1,
                 sanitizedPlantUml,
                 svgBase64
         );
     }
 
-    /*
-     * ============================================================
-     * 2. GET LATEST DIAGRAM
-     * ============================================================
-     *
-     * Temporary implementation.
-     *
-     * We will connect this to ClassDiagramRepository after
-     * confirming the fields in your entity.
-     */
+
+    // =========================================================
+    // GET LATEST UML VERSION
+    // =========================================================
 
     public UmlGenerationResponse getLatest(
             Long diagramId
     ) {
 
-        throw new UnsupportedOperationException(
-                "getLatest() database implementation is not connected yet."
+        if (diagramId == null) {
+            throw new IllegalArgumentException(
+                    "Diagram ID cannot be null."
+            );
+        }
+
+
+        ClassDiagram diagram =
+                diagramRepository
+                        .findById(diagramId)
+                        .orElseThrow(
+                                () ->
+                                        new RuntimeException(
+                                                "UML diagram not found."
+                                        )
+                        );
+
+
+        ClassDiagramVersion version =
+                versionRepository
+                        .findTopByDiagramIdOrderByVersionNumberDesc(
+                                diagramId
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new RuntimeException(
+                                                "No UML version found."
+                                        )
+                        );
+
+
+        String svg =
+                plantUmlRenderService.renderToSvg(
+                        version.getPlantUmlCode()
+                );
+
+
+        String svgBase64 =
+                Base64.getEncoder()
+                        .encodeToString(
+                                svg.getBytes(
+                                        StandardCharsets.UTF_8
+                                )
+                        );
+
+
+        return new UmlGenerationResponse(
+                diagram.getId(),
+                version.getVersionNumber(),
+                version.getPlantUmlCode(),
+                svgBase64
         );
     }
 
-    /*
-     * ============================================================
-     * 3. SAVE EDITED VERSION
-     * ============================================================
-     *
-     * Temporary implementation.
-     *
-     * This will:
-     *
-     * Controller
-     *      ↓
-     * UmlGenerationService
-     *      ↓
-     * ClassDiagramVersionRepository
-     *      ↓
-     * PostgreSQL
-     *
-     * after we connect the entities and repositories.
-     */
 
+    // =========================================================
+    // SAVE MANUALLY EDITED VERSION
+    // =========================================================
+
+    @Transactional
     public UmlGenerationResponse saveEditedVersion(
             Long diagramId,
             UmlEditRequest request
@@ -133,22 +248,90 @@ public class UmlGenerationService {
             );
         }
 
+
         if (request == null) {
             throw new IllegalArgumentException(
                     "Edit request cannot be null."
             );
         }
 
-        throw new UnsupportedOperationException(
-                "saveEditedVersion() database implementation is not connected yet."
+
+        ClassDiagram diagram =
+                diagramRepository
+                        .findById(diagramId)
+                        .orElseThrow(
+                                () ->
+                                        new RuntimeException(
+                                                "UML diagram not found."
+                                        )
+                        );
+
+
+        String sanitizedPlantUml =
+                plantUmlSanitizer.sanitize(
+                        request.plantUmlCode()
+                );
+
+
+        String svg =
+                plantUmlRenderService.renderToSvg(
+                        sanitizedPlantUml
+                );
+
+
+        String svgBase64 =
+                Base64.getEncoder()
+                        .encodeToString(
+                                svg.getBytes(
+                                        StandardCharsets.UTF_8
+                                )
+                        );
+
+
+        int newVersion =
+                diagram.getCurrentVersion() + 1;
+
+
+        ClassDiagramVersion version =
+                ClassDiagramVersion.builder()
+                        .diagramId(diagramId)
+                        .versionNumber(newVersion)
+                        .plantUmlCode(
+                                sanitizedPlantUml
+                        )
+                        .source(
+                                DiagramSource.MANUAL
+                        )
+                        .build();
+
+
+        versionRepository.save(version);
+
+
+        diagram.setCurrentVersion(
+                newVersion
+        );
+
+        diagram.setStatus(
+                DiagramStatus.DRAFT
+        );
+
+
+        diagramRepository.save(diagram);
+
+
+        return new UmlGenerationResponse(
+                diagram.getId(),
+                newVersion,
+                sanitizedPlantUml,
+                svgBase64
         );
     }
 
-    /*
-     * ============================================================
-     * 4. GET ALL VERSIONS
-     * ============================================================
-     */
+
+    // =========================================================
+    // GET ALL VERSIONS
+    // =========================================================
 
     public List<ClassDiagramVersion> findVersions(
             Long diagramId
@@ -160,16 +343,25 @@ public class UmlGenerationService {
             );
         }
 
-        throw new UnsupportedOperationException(
-                "findVersions() database implementation is not connected yet."
-        );
+
+        if (!diagramRepository.existsById(diagramId)) {
+
+            throw new RuntimeException(
+                    "UML diagram not found."
+            );
+        }
+
+
+        return versionRepository
+                .findByDiagramIdOrderByVersionNumberDesc(
+                        diagramId
+                );
     }
 
-    /*
-     * ============================================================
-     * 5. GET DIAGRAMS FOR PROJECT
-     * ============================================================
-     */
+
+    // =========================================================
+    // GET ALL DIAGRAMS FOR PROJECT
+    // =========================================================
 
     public List<UmlDiagramSummaryResponse> findByProject(
             Long projectId
@@ -181,22 +373,46 @@ public class UmlGenerationService {
             );
         }
 
-        throw new UnsupportedOperationException(
-                "findByProject() database implementation is not connected yet."
-        );
+
+        return diagramRepository
+                .findByProjectIdOrderByUpdatedAtDesc(
+                        projectId
+                )
+                .stream()
+                .map(
+                        diagram ->
+                                new UmlDiagramSummaryResponse(
+
+                                        diagram.getId(),
+
+                                        diagram.getProjectId(),
+
+                                        diagram.getName(),
+
+                                        diagram.getStatus(),
+
+                                        diagram.getCurrentVersion(),
+
+                                        diagram.getCreatedAt(),
+
+                                        diagram.getUpdatedAt()
+                                )
+                )
+                .toList();
     }
 
-    /*
-     * ============================================================
-     * BUILD GEMINI PROMPT
-     * ============================================================
-     */
+
+    // =========================================================
+    // BUILD GEMINI PROMPT
+    // =========================================================
 
     private String buildPrompt(
             UmlGenerationRequest request
     ) {
 
-        StringBuilder prompt = new StringBuilder();
+        StringBuilder prompt =
+                new StringBuilder();
+
 
         prompt.append("""
                 You are a software engineering expert.
@@ -226,37 +442,68 @@ public class UmlGenerationService {
                 Project:
                 """);
 
-        prompt.append(request.projectName())
+
+        prompt.append(
+                        request.projectName()
+                )
                 .append("\n\n");
 
-        prompt.append("Requirements:\n");
 
-        for (RequirementForUml requirement :
-                request.requirements()) {
+        prompt.append(
+                "Requirements:\n"
+        );
+
+
+        for (
+                RequirementForUml requirement :
+                request.requirements()
+        ) {
 
             prompt.append("\n");
 
-            prompt.append("Requirement Code: ")
-                    .append(requirement.code())
+
+            prompt.append(
+                            "Requirement Code: "
+                    )
+                    .append(
+                            requirement.code()
+                    )
                     .append("\n");
 
-            prompt.append("Title: ")
-                    .append(requirement.title())
+
+            prompt.append(
+                            "Title: "
+                    )
+                    .append(
+                            requirement.title()
+                    )
                     .append("\n");
 
-            prompt.append("Description: ")
-                    .append(requirement.description())
+
+            prompt.append(
+                            "Description: "
+                    )
+                    .append(
+                            requirement.description()
+                    )
                     .append("\n");
 
-            prompt.append("Type: ")
-                    .append(requirement.type())
+
+            prompt.append(
+                            "Type: "
+                    )
+                    .append(
+                            requirement.type()
+                    )
                     .append("\n");
         }
+
 
         prompt.append("""
                 
                 Generate the final PlantUML class diagram now.
                 """);
+
 
         return prompt.toString();
     }
