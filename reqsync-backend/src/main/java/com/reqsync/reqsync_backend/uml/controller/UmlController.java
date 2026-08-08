@@ -15,59 +15,42 @@ import java.util.List;
 @RequestMapping("/api/uml")
 public class UmlController {
 
-    private final UmlGenerationService
-            umlService;
+    private final UmlGenerationService umlService;
 
-    public UmlController(
-            UmlGenerationService umlService
-    ) {
+    public UmlController(UmlGenerationService umlService) {
         this.umlService = umlService;
     }
 
     @PostMapping("/generate")
-    public ResponseEntity<UmlGenerationResponse>
-    generate(
-
+    public ResponseEntity<UmlGenerationResponse> generate(
             @Valid
             @RequestBody
             UmlGenerationRequest request
-
     ) {
-
         return ResponseEntity.ok(
                 umlService.generate(request)
         );
     }
 
     @GetMapping("/{diagramId}")
-    public ResponseEntity<UmlGenerationResponse>
-    getLatest(
-
+    public ResponseEntity<UmlGenerationResponse> getLatest(
             @PathVariable
             Long diagramId
-
     ) {
-
         return ResponseEntity.ok(
-                umlService.getLatest(
-                        diagramId
-                )
+                umlService.getLatest(diagramId)
         );
     }
 
     @PostMapping("/{diagramId}/versions")
-    public ResponseEntity<UmlGenerationResponse>
-    createEditedVersion(
-
+    public ResponseEntity<UmlGenerationResponse> createEditedVersion(
             @PathVariable
             Long diagramId,
 
             @Valid
             @RequestBody
             UmlEditRequest request
-
     ) {
-
         return ResponseEntity.ok(
                 umlService.saveEditedVersion(
                         diagramId,
@@ -77,38 +60,22 @@ public class UmlController {
     }
 
     @GetMapping("/{diagramId}/versions")
-    public ResponseEntity<
-            List<ClassDiagramVersion>
-            >
-    getVersions(
-
+    public ResponseEntity<List<ClassDiagramVersion>> getVersions(
             @PathVariable
             Long diagramId
-
     ) {
-
         return ResponseEntity.ok(
-                umlService.findVersions(
-                        diagramId
-                )
+                umlService.findVersions(diagramId)
         );
     }
 
     @GetMapping("/project/{projectId}")
-    public ResponseEntity<
-            List<UmlDiagramSummaryResponse>
-            >
-    getProjectDiagrams(
-
+    public ResponseEntity<List<UmlDiagramSummaryResponse>> getProjectDiagrams(
             @PathVariable
             Long projectId
-
     ) {
-
         return ResponseEntity.ok(
-                umlService.findByProject(
-                        projectId
-                )
+                umlService.findByProject(projectId)
         );
     }
 }

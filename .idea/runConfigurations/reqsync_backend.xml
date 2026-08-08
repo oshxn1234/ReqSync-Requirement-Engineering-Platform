@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="reqsync_backemd" type="MavenRunConfiguration" factoryName="Maven">
+  <configuration default="false" name="reqsync_backend" type="MavenRunConfiguration" factoryName="Maven">
     <MavenSettings>
       <option name="myGeneralSettings" />
       <option name="myRunnerSettings" />
@@ -11,8 +11,8 @@
           </option>
           <option name="goals">
             <list>
-              <option value="package" />
-              <option value="install" />
+              <option value="clean" />
+              <option value="compile" />
             </list>
           </option>
           <option name="multimoduleDir" />

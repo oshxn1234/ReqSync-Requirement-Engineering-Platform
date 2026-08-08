@@ -5,10 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="6cd184bf-fc08-4ddf-af27-e6c93b0f37c2" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/service/PlantUmlRenderService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/service/PlantUmlSanitizer.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/service/UmlGenerationService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/reqsync_backemd.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/reqsync_backend.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/service/PlantUmlRenderService.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/service/PlantUmlRenderService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/service/PlantUmlSanitizer.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/service/PlantUmlSanitizer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/service/UmlGenerationService.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/service/UmlGenerationService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/controller/UmlController.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/controller/UmlController.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -37,6 +39,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "uml-class-diagram-generation",
     "ignore.virus.scanning.warn.message": "true",
     "kotlin-language-version-configured": "true",
