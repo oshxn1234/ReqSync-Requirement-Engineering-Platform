@@ -5,13 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="6cd184bf-fc08-4ddf-af27-e6c93b0f37c2" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/service/PlantUmlRenderService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/service/PlantUmlSanitizer.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/service/UmlGenerationService.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/reqsync-backend/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlEditRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlEditRequest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlGenerationRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlGenerationRequest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlGenerationResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlGenerationResponse.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/RequirementForUml.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/RequirementForUml.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/UmlDiagramSummaryResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/UmlDiagramSummaryResponse.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,9 +41,9 @@
     "ignore.virus.scanning.warn.message": "true",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "C:/Users/Administrator/Desktop/ReqSync-Requirement-Engineering-Platform",
-    "project.structure.last.edited": "Project",
+    "project.structure.last.edited": "SDKs",
     "project.structure.proportion": "0.0",
-    "project.structure.side.proportion": "0.0",
+    "project.structure.side.proportion": "0.2",
     "settings.editor.selected.configurable": "preferences.pluginManager"
   }
 }]]></component>
