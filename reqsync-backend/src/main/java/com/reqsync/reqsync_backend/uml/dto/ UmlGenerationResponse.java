@@ -1,4 +1,5 @@
-package com.reqsync.reqsync_backend.uml.controller;
+package com.reqsync.reqsync_backend.uml.dto;
+
 public record UmlGenerationResponse(
 
         Long diagramId,
@@ -9,4 +10,5 @@ public record UmlGenerationResponse(
 
         String svgBase64
 
-)
+) {
+}

@@ -5,13 +5,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="6cd184bf-fc08-4ddf-af27-e6c93b0f37c2" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlEditRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlGenerationRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlGenerationResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/RequirementForUml.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/UmlDiagramSummaryResponse.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/reqsync-backend/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/ReqsyncBackendApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/ReqsyncBackendApplication.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlEditRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlEditRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlGenerationRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlGenerationRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlGenerationResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/ UmlGenerationResponse.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/RequirementForUml.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/RequirementForUml.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/UmlDiagramSummaryResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/reqsync-backend/src/main/java/com/reqsync/reqsync_backend/uml/dto/UmlDiagramSummaryResponse.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -33,6 +33,9 @@
   "keyToString": {
     "Application.ReqSync Backend.executor": "Run",
     "Application.reqsync_backend.executor": "Run",
+    "Maven.reqsync-backemd.executor": "Run",
+    "Maven.reqsync_backemd.executor": "Run",
+    "Maven.reqsync_backend.executor": "Run",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
@@ -40,7 +43,11 @@
     "git-widget-placeholder": "uml-class-diagram-generation",
     "ignore.virus.scanning.warn.message": "true",
     "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "C:/Users/Administrator/Desktop/ReqSync-Requirement-Engineering-Platform"
+    "last_opened_file_path": "C:/Users/Administrator/Desktop/ReqSync-Requirement-Engineering-Platform",
+    "project.structure.last.edited": "Project",
+    "project.structure.proportion": "0.0",
+    "project.structure.side.proportion": "0.0",
+    "settings.editor.selected.configurable": "preferences.pluginManager"
   }
 }]]></component>
   <component name="RecentsManager">
@@ -49,15 +56,6 @@
     </key>
   </component>
   <component name="RunManager">
-    <configuration name="ReqSync Backend" type="Application" factoryName="Application">
-      <option name="ALTERNATIVE_JRE_PATH" value="21" />
-      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
-      <option name="MAIN_CLASS_NAME" value="ReqsyncBackendApplication" />
-      <option name="PROGRAM_PARAMETERS" value="$MODULE_DIR$" />
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
     <configuration default="true" type="JetRunConfigurationType">
       <module name="ReqSync-Requirement-Engineering-Platform" />
       <method v="2">

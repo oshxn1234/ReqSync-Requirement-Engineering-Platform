@@ -1,4 +1,5 @@
-package com.reqsync.reqsync_backend.uml.controller;
+package com.reqsync.reqsync_backend.uml.dto;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;

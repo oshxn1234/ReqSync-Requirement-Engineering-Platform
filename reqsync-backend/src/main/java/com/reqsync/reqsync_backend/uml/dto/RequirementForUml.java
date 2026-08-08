@@ -1,4 +1,5 @@
-package com.reqsync.reqsync_backend.uml.controller;
+package com.reqsync.reqsync_backend.uml.dto;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -19,4 +20,5 @@ public record RequirementForUml(
         @NotBlank(message = "Requirement type is required.")
         String type
 
-)
+) {
+}

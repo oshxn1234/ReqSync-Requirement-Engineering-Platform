@@ -1,4 +1,4 @@
-package com.reqsync.reqsync_backend.uml.controller;
+package com.reqsync.reqsync_backend.uml.dto;
 
 import com.reqsync.reqsync_backend.uml.enums.DiagramStatus;
 
@@ -20,4 +20,5 @@ public record UmlDiagramSummaryResponse(
 
         LocalDateTime updatedAt
 
-)
+) {
+}
