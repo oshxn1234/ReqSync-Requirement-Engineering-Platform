@@ -2,12 +2,16 @@ package com.reqsync.reqsync_backend.uml.service;
 
 import com.reqsync.reqsync_backend.ai.client.GeminiClient;
 import com.reqsync.reqsync_backend.uml.dto.RequirementForUml;
+import com.reqsync.reqsync_backend.uml.dto.UmlDiagramSummaryResponse;
+import com.reqsync.reqsync_backend.uml.dto.UmlEditRequest;
 import com.reqsync.reqsync_backend.uml.dto.UmlGenerationRequest;
 import com.reqsync.reqsync_backend.uml.dto.UmlGenerationResponse;
+import com.reqsync.reqsync_backend.uml.entity.ClassDiagramVersion;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 
 @Service
 public class UmlGenerationService {
@@ -26,6 +30,12 @@ public class UmlGenerationService {
         this.plantUmlRenderService = plantUmlRenderService;
     }
 
+    /*
+     * ============================================================
+     * 1. GENERATE UML DIAGRAM
+     * ============================================================
+     */
+
     public UmlGenerationResponse generate(
             UmlGenerationRequest request
     ) {
@@ -38,14 +48,6 @@ public class UmlGenerationService {
 
         String prompt = buildPrompt(request);
 
-        /*
-         * This assumes GeminiClient has:
-         *
-         * String generateText(String prompt)
-         *
-         * If your GeminiClient uses a different method name,
-         * change this one line.
-         */
         String generatedPlantUml =
                 geminiClient.generateText(prompt);
 
@@ -57,19 +59,16 @@ public class UmlGenerationService {
             );
         }
 
-        // Clean and validate Gemini's output
         String sanitizedPlantUml =
                 plantUmlSanitizer.sanitize(
                         generatedPlantUml
                 );
 
-        // Convert PlantUML → SVG
         String svg =
                 plantUmlRenderService.renderToSvg(
                         sanitizedPlantUml
                 );
 
-        // Convert SVG to Base64 for frontend
         String svgBase64 =
                 Base64.getEncoder().encodeToString(
                         svg.getBytes(StandardCharsets.UTF_8)
@@ -82,6 +81,116 @@ public class UmlGenerationService {
                 svgBase64
         );
     }
+
+    /*
+     * ============================================================
+     * 2. GET LATEST DIAGRAM
+     * ============================================================
+     *
+     * Temporary implementation.
+     *
+     * We will connect this to ClassDiagramRepository after
+     * confirming the fields in your entity.
+     */
+
+    public UmlGenerationResponse getLatest(
+            Long diagramId
+    ) {
+
+        throw new UnsupportedOperationException(
+                "getLatest() database implementation is not connected yet."
+        );
+    }
+
+    /*
+     * ============================================================
+     * 3. SAVE EDITED VERSION
+     * ============================================================
+     *
+     * Temporary implementation.
+     *
+     * This will:
+     *
+     * Controller
+     *      ↓
+     * UmlGenerationService
+     *      ↓
+     * ClassDiagramVersionRepository
+     *      ↓
+     * PostgreSQL
+     *
+     * after we connect the entities and repositories.
+     */
+
+    public UmlGenerationResponse saveEditedVersion(
+            Long diagramId,
+            UmlEditRequest request
+    ) {
+
+        if (diagramId == null) {
+            throw new IllegalArgumentException(
+                    "Diagram ID cannot be null."
+            );
+        }
+
+        if (request == null) {
+            throw new IllegalArgumentException(
+                    "Edit request cannot be null."
+            );
+        }
+
+        throw new UnsupportedOperationException(
+                "saveEditedVersion() database implementation is not connected yet."
+        );
+    }
+
+    /*
+     * ============================================================
+     * 4. GET ALL VERSIONS
+     * ============================================================
+     */
+
+    public List<ClassDiagramVersion> findVersions(
+            Long diagramId
+    ) {
+
+        if (diagramId == null) {
+            throw new IllegalArgumentException(
+                    "Diagram ID cannot be null."
+            );
+        }
+
+        throw new UnsupportedOperationException(
+                "findVersions() database implementation is not connected yet."
+        );
+    }
+
+    /*
+     * ============================================================
+     * 5. GET DIAGRAMS FOR PROJECT
+     * ============================================================
+     */
+
+    public List<UmlDiagramSummaryResponse> findByProject(
+            Long projectId
+    ) {
+
+        if (projectId == null) {
+            throw new IllegalArgumentException(
+                    "Project ID cannot be null."
+            );
+        }
+
+        throw new UnsupportedOperationException(
+                "findByProject() database implementation is not connected yet."
+        );
+    }
+
+    /*
+     * ============================================================
+     * BUILD GEMINI PROMPT
+     * ============================================================
+     */
 
     private String buildPrompt(
             UmlGenerationRequest request
@@ -113,7 +222,7 @@ public class UmlGenerationService {
                    - dependency
                 10. Do not invent unnecessary classes.
                 11. Keep the diagram understandable.
-                
+
                 Project:
                 """);
 
