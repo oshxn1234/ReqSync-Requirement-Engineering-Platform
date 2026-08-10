@@ -1,0 +1,28 @@
+[33m322a99e[m[33m ([m[1;31morigin/uml-class-diagram-generation[m[33m, [m[1;32muml-class-diagram-generation[m[33m)[m Implement UML class diagram generation with database versioning
+[33maf0b5f9[m new commit
+[33m28bea40[m service commit
+[33m41de8cc[m services
+[33m580e5af[m new commit
+[33mc67504b[m commits for the dto
+[33m55f284d[m Add UML entities repositories and initial configuration
+[33m04668eb[m Remove old frontend folder
+[33m9f63222[m Initialize Spring Boot backend with Maven wrapper
+[33m4148a30[m Rename frontend to reqsync-frontend
+[33m40947ed[m Move Next.js frontend into frontend folder
+[33m965be57[m new commit
+[33mcf247c7[m new commit
+[33m96bf2ae[m update page tsx
+[33m6679bb1[m new commit
+[33m5809a7a[m new commmit
+[33m04c4b39[m new commit
+[33m673aa6b[m new commit
+[33m69ce7e6[m new commit
+[33m987e5b0[m Add lint output and update dependencies
+[33ma0bf040[m Add AI team suitability UI & collapsible sidebar
+[33m62eef55[m Add sidebar state and toggle to project store
+[33m49c8db0[m new commit
+[33m498f094[m new commit
+[33mbff0cfc[m new commit
+[33m51fc3f2[m new commit
+[33m8750501[m new commit
+[33m1bff155[m new commit
