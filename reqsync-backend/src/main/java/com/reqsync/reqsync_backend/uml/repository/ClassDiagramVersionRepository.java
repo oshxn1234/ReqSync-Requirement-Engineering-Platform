@@ -11,13 +11,11 @@ public interface ClassDiagramVersionRepository
         extends JpaRepository<ClassDiagramVersion, Long> {
 
     List<ClassDiagramVersion>
-    findByDiagramIdOrderByVersionNumberDesc(
-            Long diagramId
-    );
-
+    findByDiagramIdOrderByVersionNumberDesc(Long diagramId);
 
     Optional<ClassDiagramVersion>
-    findTopByDiagramIdOrderByVersionNumberDesc(
-            Long diagramId
-    );
+    findTopByDiagramIdOrderByVersionNumberDesc(Long diagramId);
+
+    Optional<ClassDiagramVersion>
+    findByDiagramIdAndVersionNumber(Long diagramId, Integer versionNumber);
 }
