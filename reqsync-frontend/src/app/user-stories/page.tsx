@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
+import { UserStoryAndSrsGenerator } from '@/components/userstory/UserStoryAndSrsGenerator';
 
 // Form validation schema
 const storySchema = z.object({
@@ -33,6 +34,8 @@ export default function UserStories() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showGenerator, setShowGenerator] = useState(false);
+  const projectName = useProjectStore((state) => state.settings.projectName);
 
   useEffect(() => {
     setMounted(true);
@@ -79,6 +82,15 @@ export default function UserStories() {
     setIsModalOpen(false);
   };
 
+  const mappedRequirements = requirements.map((req) => ({
+    code: req.id,
+    title: req.title,
+    description: req.description,
+    type: req.type,
+    priority: req.priority,
+    actor: req.owner || 'User',
+  }));
+
   const getStatusColor = (status: UserStory['status']) => {
     switch (status) {
       case 'Done': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -106,6 +118,7 @@ export default function UserStories() {
               <p className="text-xs text-slate-500">Agile user stories linked to system requirements</p>
             </div>
 
+            <div className="flex gap-3">
             <button
               onClick={() => setIsModalOpen(true)}
               className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
@@ -113,6 +126,13 @@ export default function UserStories() {
               <Plus className="w-4 h-4" />
               <span>New User Story</span>
             </button>
+            <button
+              onClick={() => setShowGenerator(true)}
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <span>Open Generator</span>
+            </button>
+          </div>
           </div>
 
           {/* Filters */}
@@ -222,6 +242,18 @@ export default function UserStories() {
       </div>
 
       {/* Creation Modal Dialog */}
+      {showGenerator && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="max-w-5xl w-full">
+            <UserStoryAndSrsGenerator
+              projectName={projectName || 'Project'}
+              requirements={mappedRequirements}
+              onClose={() => setShowGenerator(false)}
+            />
+          </div>
+        </div>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
