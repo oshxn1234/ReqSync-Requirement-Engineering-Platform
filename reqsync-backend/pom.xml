@@ -2,9 +2,13 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
+
+    <!-- ===================================================== -->
+    <!-- Spring Boot Parent                                    -->
+    <!-- ===================================================== -->
 
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -13,50 +17,140 @@
         <relativePath/>
     </parent>
 
+
+    <!-- ===================================================== -->
+    <!-- Project Information                                   -->
+    <!-- ===================================================== -->
+
     <groupId>com.reqsync</groupId>
+
     <artifactId>reqsync-backend</artifactId>
+
     <version>0.0.1-SNAPSHOT</version>
+
     <name>reqsync-backend</name>
-    <description>ReqSync Requirement Engineering Platform Backend</description>
+
+    <description>
+        ReqSync Requirement Engineering Platform Backend
+    </description>
+
+
+    <!-- ===================================================== -->
+    <!-- Properties                                            -->
+    <!-- ===================================================== -->
 
     <properties>
+
+        <!-- Java version -->
         <java.version>21</java.version>
+
     </properties>
+
+
+    <!-- ===================================================== -->
+    <!-- Dependencies                                          -->
+    <!-- ===================================================== -->
 
     <dependencies>
 
-        <!-- Spring Boot - JPA -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
-        </dependency>
 
-        <!-- Spring Boot - Security -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security</artifactId>
-        </dependency>
+        <!-- ================================================= -->
+        <!-- Spring Boot Web MVC                               -->
+        <!-- ================================================= -->
 
-        <!-- Spring Boot - Validation -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
-        </dependency>
-
-        <!-- Spring Boot - Web MVC -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
 
-        <!-- Jackson 2
-             Required by GeminiClient and RequirementExtractionService -->
+
+        <!-- ================================================= -->
+        <!-- Spring Data JPA                                   -->
+        <!-- ================================================= -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+
+        <!-- ================================================= -->
+        <!-- Bean Validation                                   -->
+        <!-- Required for @NotNull, @NotBlank, @Size, etc.    -->
+        <!-- ================================================= -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+
+        <!-- ================================================= -->
+        <!-- Spring Security                                   -->
+        <!-- ================================================= -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+
+        <!-- ================================================= -->
+        <!-- Jackson                                           -->
+        <!-- Required for JSON parsing in GeminiClient and    -->
+        <!-- RequirementExtractionService                    -->
+        <!-- ================================================= -->
+
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
-        <!-- Spring Boot DevTools -->
+        <!-- Jackson 2 Spring Boot support -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
+        </dependency>
+        <!-- ================================================= -->
+        <!-- PostgreSQL                                        -->
+        <!-- ================================================= -->
+
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-restclient</artifactId>
+        </dependency>
+
+        <!-- ================================================= -->
+        <!-- H2 Database (Testing)                            -->
+        <!-- ================================================= -->
+
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+
+        <!-- ================================================= -->
+        <!-- Lombok                                             -->
+        <!-- ================================================= -->
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+
+        <!-- ================================================= -->
+        <!-- Spring Boot DevTools                              -->
+        <!-- ================================================= -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
@@ -64,116 +158,109 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- PostgreSQL -->
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
-        </dependency>
 
-        <!-- Lombok -->
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <optional>true</optional>
-        </dependency>
+        <!-- ================================================= -->
+        <!-- Testing                                           -->
+        <!-- ================================================= -->
 
-        <!-- Test - JPA -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
 
-        <!-- Test - Security -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Test - Validation -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Test - Web MVC -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webmvc-test</artifactId>
-            <scope>test</scope>
-        </dependency>
 
     </dependencies>
+
+
+    <!-- ===================================================== -->
+    <!-- Build                                                 -->
+    <!-- ===================================================== -->
 
     <build>
 
         <plugins>
 
-            <!-- Spring Boot Maven Plugin -->
+
+            <!-- ============================================= -->
+            <!-- Spring Boot Maven Plugin                      -->
+            <!-- ============================================= -->
+
             <plugin>
+
                 <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
+
+                <artifactId>
+                    spring-boot-maven-plugin
+                </artifactId>
+
+                <configuration>
+
+                    <excludes>
+
+                        <exclude>
+
+                            <groupId>
+                                org.projectlombok
+                            </groupId>
+
+                            <artifactId>
+                                lombok
+                            </artifactId>
+
+                        </exclude>
+
+                    </excludes>
+
+                </configuration>
+
             </plugin>
 
-            <!-- Maven Compiler Plugin -->
+
+            <!-- ============================================= -->
+            <!-- Maven Compiler Plugin                         -->
+            <!-- ============================================= -->
+
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
 
-                <executions>
+                <groupId>
+                    org.apache.maven.plugins
+                </groupId>
 
-                    <!-- Main source compilation -->
-                    <execution>
-                        <id>default-compile</id>
-                        <phase>compile</phase>
+                <artifactId>
+                    maven-compiler-plugin
+                </artifactId>
 
-                        <goals>
-                            <goal>compile</goal>
-                        </goals>
+                <configuration>
 
-                        <configuration>
-                            <annotationProcessorPaths>
+                    <release>21</release>
 
-                                <!-- Lombok Annotation Processor -->
-                                <path>
-                                    <groupId>org.projectlombok</groupId>
-                                    <artifactId>lombok</artifactId>
-                                </path>
+                    <annotationProcessorPaths>
 
-                            </annotationProcessorPaths>
-                        </configuration>
-                    </execution>
+                        <!-- Lombok annotation processor -->
 
-                    <!-- Test source compilation -->
-                    <execution>
-                        <id>default-testCompile</id>
-                        <phase>test-compile</phase>
+                        <path>
 
-                        <goals>
-                            <goal>testCompile</goal>
-                        </goals>
+                            <groupId>
+                                org.projectlombok
+                            </groupId>
 
-                        <configuration>
-                            <annotationProcessorPaths>
+                            <artifactId>
+                                lombok
+                            </artifactId>
 
-                                <!-- Lombok Annotation Processor -->
-                                <path>
-                                    <groupId>org.projectlombok</groupId>
-                                    <artifactId>lombok</artifactId>
-                                </path>
+                        </path>
 
-                            </annotationProcessorPaths>
-                        </configuration>
-                    </execution>
+                    </annotationProcessorPaths>
 
-                </executions>
+                </configuration>
+
             </plugin>
+
 
         </plugins>
 
     </build>
+
 
 </project>

@@ -17,9 +17,9 @@ public class GeminiClient {
 
     public GeminiClient(
             RestClient.Builder builder,
-            @Value("${gemini.api-key}") String apiKey,
-            @Value("${gemini.base-url}") String baseUrl,
-            @Value("${gemini.model}") String model
+            @Value("AQ.Ab8RN6J9kppxCKvzraqVSzrqtrLqYcmfUvGi4mTFpm0XUUpZHg") String apiKey,
+            @Value("AQ.Ab8RN6J9kppxCKvzraqVSzrqtrLqYcmfUvGi4mTFpm0XUUpZHg") String baseUrl,
+            @Value("AQ.Ab8RN6J9kppxCKvzraqVSzrqtrLqYcmfUvGi4mTFpm0XUUpZHg") String model
     ) {
         this.model = model;
 
