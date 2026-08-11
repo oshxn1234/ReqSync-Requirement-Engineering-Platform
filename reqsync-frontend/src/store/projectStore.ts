@@ -148,7 +148,7 @@ interface ProjectState {
     classes: UmlClass[];
     relationships: UmlRelationship[];
   };
-  
+
   // Actions
   addRequirement: (req: Omit<Requirement, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'completeness' | 'completenessBreakdown' | 'aiSuggestions' | 'affectedReqs' | 'affectedTasks' | 'affectedStories' | 'affectedTestCases' | 'impactExplanation'>) => void;
   updateRequirement: (id: string, updates: Partial<Requirement>) => void;
@@ -787,7 +787,7 @@ export const useProjectStore = create<ProjectState>()(
       addBaseline: (baseline) =>
         set((state) => {
           const activeReqsCount = state.requirements.filter((r) => r.status === 'Approved').length;
-          
+
           // Mark older baselines as superseded
           const updatedBaselines = state.baselines.map((b) => ({
             ...b,
@@ -822,12 +822,12 @@ export const useProjectStore = create<ProjectState>()(
                 req.id === reqId ? { ...req, status: 'Approved' as const } : req
               );
             }
-            
+
             // If approving a baseline
             if (approvedItem.type === 'Baseline') {
               const baseMatch = approvedItem.title.match(/v\d+\.\d+/);
               const baseVer = baseMatch ? baseMatch[0] : 'v1.4';
-              
+
               const alreadyExists = state.baselines.some((b) => b.version === baseVer);
               if (!alreadyExists) {
                 const activeReqsCount = state.requirements.filter((r) => r.status === 'Approved').length;
@@ -1137,14 +1137,14 @@ export const useProjectStore = create<ProjectState>()(
           tasks: state.tasks.map((task) =>
             task.id === taskId
               ? {
-                  ...task,
-                  status: 'Ready for QA' as const,
-                  implementationDetails: {
-                    githubLink,
-                    notes,
-                    submittedAt: new Date().toISOString().split('T')[0]
-                  }
+                ...task,
+                status: 'Ready for QA' as const,
+                implementationDetails: {
+                  githubLink,
+                  notes,
+                  submittedAt: new Date().toISOString().split('T')[0]
                 }
+              }
               : task
           )
         })),
@@ -1154,15 +1154,15 @@ export const useProjectStore = create<ProjectState>()(
           tasks: state.tasks.map((task) =>
             task.id === taskId
               ? {
-                  ...task,
-                  status: (passed ? 'Done' : 'In Progress') as any,
-                  qaReview: {
-                    reviewer,
-                    comments,
-                    reviewedAt: new Date().toISOString().split('T')[0],
-                    status: passed ? 'Approved' as const : 'Changes Requested' as const
-                  }
+                ...task,
+                status: (passed ? 'Done' : 'In Progress') as any,
+                qaReview: {
+                  reviewer,
+                  comments,
+                  reviewedAt: new Date().toISOString().split('T')[0],
+                  status: passed ? 'Approved' as const : 'Changes Requested' as const
                 }
+              }
               : task
           )
         })),
@@ -1238,8 +1238,8 @@ export const useProjectStore = create<ProjectState>()(
 
       addUmlClass: (name) =>
         set((state) => {
-          const maxId = state.currentUmlDiagram.classes.length > 0 
-            ? Math.max(...state.currentUmlDiagram.classes.map(c => parseInt(c.id.replace('c', '')) || 0)) 
+          const maxId = state.currentUmlDiagram.classes.length > 0
+            ? Math.max(...state.currentUmlDiagram.classes.map(c => parseInt(c.id.replace('c', '')) || 0))
             : 0;
           const nextId = `c${maxId + 1}`;
           const newClass: UmlClass = {
@@ -1274,8 +1274,8 @@ export const useProjectStore = create<ProjectState>()(
 
       addUmlRelationship: (sourceClassId, targetClassId, type) =>
         set((state) => {
-          const maxId = state.currentUmlDiagram.relationships.length > 0 
-            ? Math.max(...state.currentUmlDiagram.relationships.map(r => parseInt(r.id.replace('r', '')) || 0)) 
+          const maxId = state.currentUmlDiagram.relationships.length > 0
+            ? Math.max(...state.currentUmlDiagram.relationships.map(r => parseInt(r.id.replace('r', '')) || 0))
             : 0;
           const nextId = `r${maxId + 1}`;
           const newRel: UmlRelationship = {
