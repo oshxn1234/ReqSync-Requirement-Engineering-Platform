@@ -10,16 +10,16 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class GeminiClient {
+public class RequirementGeminiClient {
 
     private final RestClient restClient;
     private final String model;
 
-    public GeminiClient(
+    public RequirementGeminiClient(
             RestClient.Builder builder,
-            @Value("AQ.Ab8RN6J9kppxCKvzraqVSzrqtrLqYcmfUvGi4mTFpm0XUUpZHg") String apiKey,
-            @Value("AQ.Ab8RN6J9kppxCKvzraqVSzrqtrLqYcmfUvGi4mTFpm0XUUpZHg") String baseUrl,
-            @Value("AQ.Ab8RN6J9kppxCKvzraqVSzrqtrLqYcmfUvGi4mTFpm0XUUpZHg") String model
+            @Value("${gemini.requirement.api-key}") String apiKey,
+            @Value("${gemini.base-url}") String baseUrl,
+            @Value("${gemini.model}") String model
     ) {
         this.model = model;
 

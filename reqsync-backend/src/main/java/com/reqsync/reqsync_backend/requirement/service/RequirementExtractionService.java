@@ -2,7 +2,7 @@ package com.reqsync.reqsync_backend.requirement.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.reqsync.reqsync_backend.ai.client.GeminiClient;
+import com.reqsync.reqsync_backend.ai.client.RequirementGeminiClient;
 import com.reqsync.reqsync_backend.requirement.dto.ExtractedRequirementResponse;
 import com.reqsync.reqsync_backend.requirement.dto.RequirementExtractionRequest;
 import com.reqsync.reqsync_backend.requirement.dto.RequirementExtractionResponse;
@@ -21,7 +21,7 @@ import java.util.List;
 @Transactional
 public class RequirementExtractionService {
 
-    private final GeminiClient geminiClient;
+    private final RequirementGeminiClient geminiClient;
 
     private final RequirementRepository requirementRepository;
 
@@ -35,7 +35,7 @@ public class RequirementExtractionService {
 
 
     public RequirementExtractionService(
-            GeminiClient geminiClient,
+            RequirementGeminiClient geminiClient,
             RequirementRepository requirementRepository,
             RequirementExtractionRepository requirementExtractionRepository,
             RequirementValidationService validationService,
