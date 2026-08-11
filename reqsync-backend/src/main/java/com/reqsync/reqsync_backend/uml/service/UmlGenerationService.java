@@ -1,6 +1,6 @@
 package com.reqsync.reqsync_backend.uml.service;
 
-import com.reqsync.reqsync_backend.ai.client.GeminiClient;
+import com.reqsync.reqsync_backend.ai.client.UmlGeminiClient;
 
 import com.reqsync.reqsync_backend.uml.dto.RequirementForUml;
 import com.reqsync.reqsync_backend.uml.dto.UmlDiagramSummaryResponse;
@@ -30,7 +30,7 @@ import java.util.List;
 @Service
 public class UmlGenerationService {
 
-    private final GeminiClient geminiClient;
+    private final UmlGeminiClient geminiClient;
 
     private final PlantUmlSanitizer plantUmlSanitizer;
 
@@ -46,7 +46,7 @@ public class UmlGenerationService {
 
     public UmlGenerationService(
 
-            GeminiClient geminiClient,
+            UmlGeminiClient geminiClient,
 
             PlantUmlSanitizer plantUmlSanitizer,
 

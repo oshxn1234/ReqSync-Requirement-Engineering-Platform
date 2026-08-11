@@ -10,14 +10,14 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class GeminiClient {
+public class UmlGeminiClient {
 
     private final RestClient restClient;
     private final String model;
 
-    public GeminiClient(
+    public UmlGeminiClient(
             RestClient.Builder builder,
-            @Value("${gemini.api-key}") String apiKey,
+            @Value("${gemini.uml.api-key}") String apiKey,
             @Value("${gemini.base-url}") String baseUrl,
             @Value("${gemini.model}") String model
     ) {
