@@ -7,6 +7,7 @@ import com.reqsync.reqsync_backend.requirement.entity.Requirement;
 import com.reqsync.reqsync_backend.requirement.enums.RequirementStatus;
 import com.reqsync.reqsync_backend.requirement.enums.RequirementType;
 import com.reqsync.reqsync_backend.requirement.repository.RequirementRepository;
+import com.reqsync.reqsync_backend.requirement.service.semantic.RequirementEmbeddingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,12 +17,23 @@ import java.util.List;
 @Transactional
 public class RequirementService {
 
-    private final RequirementRepository requirementRepository;
+    private final RequirementRepository
+            requirementRepository;
+
+    private final RequirementEmbeddingService
+            requirementEmbeddingService;
+
 
     public RequirementService(
-            RequirementRepository requirementRepository
+            RequirementRepository requirementRepository,
+            RequirementEmbeddingService requirementEmbeddingService
     ) {
-        this.requirementRepository = requirementRepository;
+
+        this.requirementRepository =
+                requirementRepository;
+
+        this.requirementEmbeddingService =
+                requirementEmbeddingService;
     }
 
 
@@ -29,42 +41,59 @@ public class RequirementService {
      * Get one requirement by ID.
      */
     @Transactional(readOnly = true)
-    public ExtractedRequirementResponse getById(Long requirementId) {
+    public ExtractedRequirementResponse getById(
+            Long requirementId
+    ) {
 
         Requirement requirement =
-                requirementRepository.findById(requirementId)
+                requirementRepository
+                        .findById(
+                                requirementId
+                        )
                         .orElseThrow(
-                                () -> new RuntimeException(
-                                        "Requirement not found: "
-                                                + requirementId
-                                )
+                                () ->
+                                        new RuntimeException(
+                                                "Requirement not found: "
+                                                        + requirementId
+                                        )
                         );
 
-        return toResponse(requirement);
+
+        return toResponse(
+                requirement
+        );
     }
 
 
     /**
-     * Get all requirements belonging to a project.
+     * Get all requirements belonging
+     * to a project.
      */
     @Transactional(readOnly = true)
-    public List<RequirementSummaryResponse> getByProject(
+    public List<RequirementSummaryResponse>
+    getByProject(
             Long projectId
     ) {
 
         return requirementRepository
-                .findByProjectId(projectId)
+                .findByProjectId(
+                        projectId
+                )
                 .stream()
-                .map(this::toSummaryResponse)
+                .map(
+                        this::toSummaryResponse
+                )
                 .toList();
     }
 
 
     /**
-     * Get requirements by project and status.
+     * Get requirements by project
+     * and status.
      */
     @Transactional(readOnly = true)
-    public List<RequirementSummaryResponse> getByProjectAndStatus(
+    public List<RequirementSummaryResponse>
+    getByProjectAndStatus(
             Long projectId,
             RequirementStatus status
     ) {
@@ -75,16 +104,20 @@ public class RequirementService {
                         status
                 )
                 .stream()
-                .map(this::toSummaryResponse)
+                .map(
+                        this::toSummaryResponse
+                )
                 .toList();
     }
 
 
     /**
-     * Get requirements by project and type.
+     * Get requirements by project
+     * and type.
      */
     @Transactional(readOnly = true)
-    public List<RequirementSummaryResponse> getByProjectAndType(
+    public List<RequirementSummaryResponse>
+    getByProjectAndType(
             Long projectId,
             RequirementType type
     ) {
@@ -95,59 +128,154 @@ public class RequirementService {
                         type
                 )
                 .stream()
-                .map(this::toSummaryResponse)
+                .map(
+                        this::toSummaryResponse
+                )
                 .toList();
     }
 
 
     /**
      * Update an existing requirement.
+     *
+     * Important:
+     * After updating title or description,
+     * regenerate semantic embedding.
      */
     public ExtractedRequirementResponse update(
             Long requirementId,
             RequirementUpdateRequest request
     ) {
 
+        if (request == null) {
+
+            throw new IllegalArgumentException(
+                    "Requirement update request cannot be null."
+            );
+        }
+
+
         Requirement requirement =
-                requirementRepository.findById(requirementId)
+                requirementRepository
+                        .findById(
+                                requirementId
+                        )
                         .orElseThrow(
-                                () -> new RuntimeException(
-                                        "Requirement not found: "
-                                                + requirementId
-                                )
+                                () ->
+                                        new RuntimeException(
+                                                "Requirement not found: "
+                                                        + requirementId
+                                        )
                         );
 
-        requirement.setTitle(request.getTitle());
 
+        /*
+         * Update title.
+         */
+        requirement.setTitle(
+                request.getTitle()
+        );
+
+
+        /*
+         * Update description.
+         */
         requirement.setDescription(
                 request.getDescription()
         );
 
+
+        /*
+         * Update requirement type.
+         */
         requirement.setType(
                 request.getType()
         );
 
+
+        /*
+         * Update priority.
+         */
         requirement.setPriority(
                 request.getPriority()
         );
 
+
+        /*
+         * Update lifecycle status.
+         */
         requirement.setStatus(
                 request.getStatus()
         );
 
-        Requirement updated =
-                requirementRepository.save(requirement);
 
-        return toResponse(updated);
+        /*
+         * Save changes.
+         */
+        Requirement updated =
+                requirementRepository.save(
+                        requirement
+                );
+
+
+        /*
+         * ------------------------------------------------
+         * REGENERATE EMBEDDING
+         * ------------------------------------------------
+         *
+         * The old embedding represented the
+         * previous title and description.
+         *
+         * Once requirement text changes,
+         * the semantic representation must
+         * also be updated.
+         */
+        try {
+
+            requirementEmbeddingService
+                    .generateAndStoreEmbedding(
+                            updated.getId()
+                    );
+
+        } catch (Exception embeddingException) {
+
+            /*
+             * Requirement update itself should
+             * not fail just because the external
+             * embedding API is temporarily unavailable.
+             */
+            System.err.println(
+                    "Unable to regenerate embedding for requirement "
+                            + updated.getCode()
+                            + ": "
+                            + embeddingException.getMessage()
+            );
+        }
+
+
+        return toResponse(
+                updated
+        );
     }
 
 
     /**
      * Delete a requirement.
+     *
+     * No separate embedding deletion is needed
+     * because the embedding exists in the same
+     * requirements table row.
      */
-    public void delete(Long requirementId) {
+    public void delete(
+            Long requirementId
+    ) {
 
-        if (!requirementRepository.existsById(requirementId)) {
+        if (
+                !requirementRepository
+                        .existsById(
+                                requirementId
+                        )
+        ) {
 
             throw new RuntimeException(
                     "Requirement not found: "
@@ -155,12 +283,16 @@ public class RequirementService {
             );
         }
 
-        requirementRepository.deleteById(requirementId);
+
+        requirementRepository
+                .deleteById(
+                        requirementId
+                );
     }
 
 
     /**
-     * Convert entity → complete response.
+     * Convert entity into complete DTO.
      */
     private ExtractedRequirementResponse toResponse(
             Requirement requirement
@@ -180,9 +312,10 @@ public class RequirementService {
 
 
     /**
-     * Convert entity → summary response.
+     * Convert entity into summary DTO.
      */
-    private RequirementSummaryResponse toSummaryResponse(
+    private RequirementSummaryResponse
+    toSummaryResponse(
             Requirement requirement
     ) {
 

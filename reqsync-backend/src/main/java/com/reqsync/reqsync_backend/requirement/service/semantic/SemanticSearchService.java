@@ -1,84 +1,179 @@
 package com.reqsync.reqsync_backend.requirement.service.semantic;
 
+import com.reqsync.reqsync_backend.project.repository.ProjectRepository;
 import com.reqsync.reqsync_backend.requirement.dto.SimilarRequirementResponse;
+import com.reqsync.reqsync_backend.requirement.entity.Requirement;
+import com.reqsync.reqsync_backend.requirement.repository.RequirementRepository;
 import com.reqsync.reqsync_backend.requirement.repository.SemanticSearchRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-//@Service
+@Service
 public class SemanticSearchService {
 
     private final RequirementEmbeddingService
-            embeddingService;
+            requirementEmbeddingService;
 
     private final SemanticSearchRepository
             semanticSearchRepository;
 
+    private final ProjectRepository
+            projectRepository;
+
+    private final RequirementRepository
+            requirementRepository;
+
 
     public SemanticSearchService(
-            RequirementEmbeddingService embeddingService,
-            SemanticSearchRepository semanticSearchRepository
+            RequirementEmbeddingService requirementEmbeddingService,
+            SemanticSearchRepository semanticSearchRepository,
+            ProjectRepository projectRepository,
+            RequirementRepository requirementRepository
     ) {
 
-        this.embeddingService =
-                embeddingService;
+        this.requirementEmbeddingService =
+                requirementEmbeddingService;
 
         this.semanticSearchRepository =
                 semanticSearchRepository;
+
+        this.projectRepository =
+                projectRepository;
+
+        this.requirementRepository =
+                requirementRepository;
     }
 
 
     /**
-     * Used when checking ONE selected requirement.
-     *
-     * Search every OTHER requirement
-     * belonging to the same project.
+     * General semantic search across
+     * ALL requirements in a project.
      */
     public List<SimilarRequirementResponse>
-    searchForSelectedRequirement(
+    searchProject(
             Long projectId,
+            String searchText,
+            int limit
+    ) {
+
+        validateProject(
+                projectId
+        );
+
+
+        validateLimit(
+                limit
+        );
+
+
+        String vector =
+                requirementEmbeddingService
+                        .generateQueryVector(
+                                searchText
+                        );
+
+
+        return semanticSearchRepository
+                .searchProject(
+                        projectId,
+                        vector,
+                        limit
+                );
+    }
+
+
+    /**
+     * Search other requirements while
+     * excluding a selected requirement.
+     *
+     * Requirement Completeness Analysis
+     * will use this method.
+     */
+    public List<SimilarRequirementResponse>
+    searchRelatedRequirements(
             Long selectedRequirementId,
-            String searchText
+            String searchText,
+            int limit
     ) {
 
-        String vector =
-                embeddingService.createSearchVector(
-                        searchText
-                );
+        Requirement selectedRequirement =
+                requirementRepository
+                        .findById(
+                                selectedRequirementId
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new RuntimeException(
+                                                "Requirement not found: "
+                                                        + selectedRequirementId
+                                        )
+                        );
+
+
+        validateLimit(
+                limit
+        );
+
+
+        String queryVector =
+                requirementEmbeddingService
+                        .generateQueryVector(
+                                searchText
+                        );
+
 
         return semanticSearchRepository
-                .searchProjectExceptSelected(
-                        projectId,
+                .searchProjectExcludingRequirement(
+                        selectedRequirement.getProjectId(),
                         selectedRequirementId,
-                        vector,
-                        5
+                        queryVector,
+                        limit
                 );
     }
 
 
-    /**
-     * Used for project-wide completeness.
-     *
-     * Search ALL requirements
-     * belonging to the project.
-     */
-    public List<SimilarRequirementResponse>
-    searchWholeProject(
-            Long projectId,
-            String searchText
+    private void validateProject(
+            Long projectId
     ) {
 
-        String vector =
-                embeddingService.createSearchVector(
-                        searchText
-                );
+        if (
+                projectId == null
+        ) {
 
-        return semanticSearchRepository
-                .searchWholeProject(
-                        projectId,
-                        vector,
-                        5
-                );
+            throw new IllegalArgumentException(
+                    "Project ID is required."
+            );
+        }
+
+
+        if (
+                !projectRepository
+                        .existsById(
+                                projectId
+                        )
+        ) {
+
+            throw new RuntimeException(
+                    "Project not found: "
+                            + projectId
+            );
+        }
+    }
+
+
+    private void validateLimit(
+            int limit
+    ) {
+
+        if (
+                limit < 1 ||
+                        limit > 20
+        ) {
+
+            throw new IllegalArgumentException(
+                    "Semantic search limit must be between 1 and 20."
+            );
+        }
     }
 }
