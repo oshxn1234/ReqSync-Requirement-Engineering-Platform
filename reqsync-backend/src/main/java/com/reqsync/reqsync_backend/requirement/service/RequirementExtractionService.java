@@ -355,7 +355,7 @@ public class RequirementExtractionService {
                  * cause requirement extraction
                  * itself to fail.
                  */
-                try {
+                /*try {
 
                     requirementEmbeddingService
                             .generateAndStoreEmbedding(
@@ -371,7 +371,7 @@ public class RequirementExtractionService {
                                     + embeddingException.getMessage()
                     );
                 }
-
+            */
 
                 /*
                  * Return saved requirement with
