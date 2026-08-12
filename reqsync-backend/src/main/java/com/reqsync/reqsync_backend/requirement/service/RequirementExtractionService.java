@@ -14,7 +14,7 @@ import com.reqsync.reqsync_backend.requirement.repository.RequirementRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -53,7 +53,8 @@ public class RequirementExtractionService {
         this.validationService =
                 validationService;
 
-        this.objectMapper = objectMapper;
+        this.objectMapper =
+                objectMapper;
     }
 
 
@@ -64,15 +65,17 @@ public class RequirementExtractionService {
             RequirementExtractionRequest request
     ) {
 
-        if (request == null) {
+        /*
+         * Validate request first.
+         */
+        validateExtractionRequest(
+                request
+        );
 
-            throw new IllegalArgumentException(
-                    "Extraction request cannot be null."
-            );
-        }
 
         /*
-         * Create extraction record first.
+         * Create an extraction record before
+         * sending the document to Gemini.
          */
         RequirementExtraction extraction =
                 new RequirementExtraction();
@@ -81,14 +84,34 @@ public class RequirementExtractionService {
                 request.getProjectId()
         );
 
+        /*
+         * Temporary values while we are
+         * testing through the console.
+         *
+         * Later these values can come from
+         * the React frontend.
+         */
+        extraction.setDocumentName(
+                "Meeting Notes"
+        );
+
+        extraction.setDocumentType(
+                "TEXT"
+        );
+
+        extraction.setRequirementCount(
+                0
+        );
+
         extraction.setStatus(
                 ExtractionStatus.PROCESSING
         );
 
-        extraction.setCreatedAt(
-                LocalDateTime.now()
-        );
 
+        /*
+         * @PrePersist in RequirementExtraction
+         * automatically sets createdAt and updatedAt.
+         */
         extraction =
                 requirementExtractionRepository.save(
                         extraction
@@ -98,21 +121,33 @@ public class RequirementExtractionService {
         try {
 
             /*
-             * Build AI prompt.
+             * ------------------------------------------------
+             * STEP 1
+             * Build prompt for Gemini.
+             * ------------------------------------------------
              */
             String prompt =
-                    buildPrompt(request);
+                    buildPrompt(
+                            request
+                    );
 
 
             /*
+             * ------------------------------------------------
+             * STEP 2
              * Send document content to Gemini.
+             * ------------------------------------------------
              */
             String aiResponse =
-                    geminiClient.generateText(prompt);
+                    geminiClient.generateText(
+                            prompt
+                    );
 
 
-            if (aiResponse == null ||
-                    aiResponse.isBlank()) {
+            if (
+                    aiResponse == null ||
+                            aiResponse.isBlank()
+            ) {
 
                 throw new RuntimeException(
                         "Gemini returned an empty response."
@@ -121,16 +156,23 @@ public class RequirementExtractionService {
 
 
             /*
-             * Convert Gemini JSON response
-             * into Java DTOs.
+             * ------------------------------------------------
+             * STEP 3
+             * Convert Gemini JSON into Java DTOs.
+             * ------------------------------------------------
              */
             List<ExtractedRequirementResponse>
                     extractedRequirements =
-                    parseAiResponse(aiResponse);
+                    parseAiResponse(
+                            aiResponse
+                    );
 
 
             /*
-             * Validate AI output.
+             * ------------------------------------------------
+             * STEP 4
+             * Validate the AI-generated requirements.
+             * ------------------------------------------------
              */
             List<String> validationErrors =
                     validationService.validate(
@@ -138,7 +180,9 @@ public class RequirementExtractionService {
                     );
 
 
-            if (!validationErrors.isEmpty()) {
+            if (
+                    !validationErrors.isEmpty()
+            ) {
 
                 throw new RuntimeException(
                         "Requirement validation failed: "
@@ -151,13 +195,44 @@ public class RequirementExtractionService {
 
 
             /*
-             * Save requirements.
+             * ------------------------------------------------
+             * STEP 5
+             * Save extracted requirements into PostgreSQL.
+             * ------------------------------------------------
+             *
+             * IMPORTANT:
+             *
+             * The DTOs coming from Gemini do not have
+             * PostgreSQL database IDs.
+             *
+             * Therefore:
+             *
+             * Gemini DTO
+             *     ↓
+             * Requirement entity
+             *     ↓
+             * save()
+             *     ↓
+             * PostgreSQL generates ID
+             *     ↓
+             * convert saved entity back into DTO
+             *
+             * This is why we create a separate
+             * savedRequirements list.
              */
+            List<ExtractedRequirementResponse>
+                    savedRequirements =
+                    new ArrayList<>();
+
+
             for (
                     ExtractedRequirementResponse extracted
                     : extractedRequirements
             ) {
 
+                /*
+                 * Convert Gemini DTO to entity.
+                 */
                 Requirement requirement =
                         createRequirementEntity(
                                 extracted,
@@ -165,46 +240,120 @@ public class RequirementExtractionService {
                                 extraction
                         );
 
-                requirementRepository.save(
-                        requirement
+
+                /*
+                 * Save entity.
+                 *
+                 * PostgreSQL generates the primary key here.
+                 */
+                Requirement savedRequirement =
+                        requirementRepository.save(
+                                requirement
+                        );
+
+
+                /*
+                 * Convert saved entity back into response DTO.
+                 *
+                 * savedRequirement.getId()
+                 * now contains the generated database ID.
+                 */
+                ExtractedRequirementResponse
+                        savedResponse =
+                        toResponse(
+                                savedRequirement
+                        );
+
+
+                savedRequirements.add(
+                        savedResponse
                 );
             }
 
 
             /*
+             * ------------------------------------------------
+             * STEP 6
              * Mark extraction as completed.
+             * ------------------------------------------------
              */
+            extraction.setRequirementCount(
+                    savedRequirements.size()
+            );
+
             extraction.setStatus(
                     ExtractionStatus.COMPLETED
             );
+
+            extraction.setErrorMessage(
+                    null
+            );
+
 
             requirementExtractionRepository.save(
                     extraction
             );
 
 
+            /*
+             * ------------------------------------------------
+             * STEP 7
+             * Return requirements with database IDs.
+             * ------------------------------------------------
+             */
             return new RequirementExtractionResponse(
                     extraction.getId(),
                     request.getProjectId(),
                     ExtractionStatus.COMPLETED,
-                    extractedRequirements.size(),
-                    extractedRequirements,
+                    savedRequirements.size(),
+                    savedRequirements,
                     "Requirements extracted successfully.",
                     extraction.getCreatedAt()
             );
 
+
         } catch (Exception exception) {
 
             /*
-             * Mark extraction as failed.
+             * ------------------------------------------------
+             * FAILED extraction handling.
+             * ------------------------------------------------
              */
             extraction.setStatus(
                     ExtractionStatus.FAILED
             );
 
+
+            String errorMessage =
+                    exception.getMessage();
+
+
+            /*
+             * Database error_message column
+             * has a maximum length of 2000.
+             */
+            if (
+                    errorMessage != null &&
+                            errorMessage.length() > 1900
+            ) {
+
+                errorMessage =
+                        errorMessage.substring(
+                                0,
+                                1900
+                        );
+            }
+
+
+            extraction.setErrorMessage(
+                    errorMessage
+            );
+
+
             requirementExtractionRepository.save(
                     extraction
             );
+
 
             throw new RuntimeException(
                     "Requirement extraction failed: "
@@ -216,7 +365,63 @@ public class RequirementExtractionService {
 
 
     /**
+     * Validate the request before processing.
+     */
+    private void validateExtractionRequest(
+            RequirementExtractionRequest request
+    ) {
+
+        if (request == null) {
+
+            throw new IllegalArgumentException(
+                    "Extraction request cannot be null."
+            );
+        }
+
+
+        if (
+                request.getProjectId() == null
+        ) {
+
+            throw new IllegalArgumentException(
+                    "Project ID is required."
+            );
+        }
+
+
+        if (
+                request.getProjectName() == null ||
+                        request.getProjectName().isBlank()
+        ) {
+
+            throw new IllegalArgumentException(
+                    "Project name is required."
+            );
+        }
+
+
+        if (
+                request.getDocumentContent() == null ||
+                        request.getDocumentContent().isBlank()
+        ) {
+
+            throw new IllegalArgumentException(
+                    "Document content cannot be empty."
+            );
+        }
+    }
+
+
+    /**
      * Get the latest extraction for a project.
+     *
+     * NOTE:
+     * This currently retrieves all requirements
+     * belonging to the project.
+     *
+     * We can improve this later so that it returns
+     * only the requirements created by the latest
+     * extraction.
      */
     @Transactional(readOnly = true)
     public RequirementExtractionResponse getLatestExtraction(
@@ -229,19 +434,26 @@ public class RequirementExtractionService {
                                 projectId
                         )
                         .orElseThrow(
-                                () -> new RuntimeException(
-                                        "No extraction found for project: "
-                                                + projectId
-                                )
+                                () ->
+                                        new RuntimeException(
+                                                "No extraction found for project: "
+                                                        + projectId
+                                        )
                         );
+
 
         List<ExtractedRequirementResponse>
                 requirements =
                 requirementRepository
-                        .findByProjectId(projectId)
+                        .findByProjectId(
+                                projectId
+                        )
                         .stream()
-                        .map(this::toResponse)
+                        .map(
+                                this::toResponse
+                        )
                         .toList();
+
 
         return new RequirementExtractionResponse(
                 extraction.getId(),
@@ -256,7 +468,7 @@ public class RequirementExtractionService {
 
 
     /**
-     * Build the prompt that is sent to Gemini.
+     * Build prompt sent to Gemini.
      */
     private String buildPrompt(
             RequirementExtractionRequest request
@@ -265,7 +477,9 @@ public class RequirementExtractionService {
         StringBuilder prompt =
                 new StringBuilder();
 
-        prompt.append("""
+
+        prompt.append(
+                """
                 You are a professional software requirements
                 engineering expert.
 
@@ -277,10 +491,10 @@ public class RequirementExtractionService {
                 1. Return ONLY valid JSON.
                 2. Do not return Markdown.
                 3. Do not use ```json.
-                4. Do not include explanations outside the JSON.
+                4. Do not include explanations outside JSON.
                 5. Extract only requirements supported by the document.
                 6. Do not invent unnecessary requirements.
-                7. Give each requirement a unique code.
+                7. Give every requirement a unique code.
                 8. Use codes such as REQ-001, REQ-002, REQ-003.
                 9. Identify the requirement type.
                 10. Identify the requirement priority.
@@ -310,7 +524,7 @@ public class RequirementExtractionService {
                 APPROVED
                 REJECTED
 
-                Return the result using exactly this JSON structure:
+                Return exactly this JSON structure:
 
                 [
                   {
@@ -325,32 +539,44 @@ public class RequirementExtractionService {
                 ]
 
                 Project Name:
-                """);
+                """
+        );
+
 
         prompt.append(
                 request.getProjectName()
         );
 
-        prompt.append("\n\nDocument Content:\n");
+
+        prompt.append(
+                "\n\nDocument Content:\n"
+        );
+
 
         prompt.append(
                 request.getDocumentContent()
         );
+
 
         return prompt.toString();
     }
 
 
     /**
-     * Parse the JSON returned by Gemini.
+     * Convert Gemini JSON response into DTO objects.
      */
     private List<ExtractedRequirementResponse>
-    parseAiResponse(String aiResponse) {
+    parseAiResponse(
+            String aiResponse
+    ) {
 
         try {
 
             String cleanedResponse =
-                    cleanJsonResponse(aiResponse);
+                    cleanJsonResponse(
+                            aiResponse
+                    );
+
 
             return objectMapper.readValue(
                     cleanedResponse,
@@ -359,6 +585,7 @@ public class RequirementExtractionService {
                             >() {
                     }
             );
+
 
         } catch (Exception exception) {
 
@@ -372,16 +599,32 @@ public class RequirementExtractionService {
 
     /**
      * Remove Markdown code fences if Gemini
-     * accidentally returns them.
+     * accidentally includes them.
      */
     private String cleanJsonResponse(
             String response
     ) {
 
+        if (
+                response == null ||
+                        response.isBlank()
+        ) {
+
+            throw new RuntimeException(
+                    "Gemini response is empty."
+            );
+        }
+
+
         String cleaned =
                 response.trim();
 
-        if (cleaned.startsWith("```json")) {
+
+        if (
+                cleaned.startsWith(
+                        "```json"
+                )
+        ) {
 
             cleaned =
                     cleaned.substring(
@@ -389,7 +632,12 @@ public class RequirementExtractionService {
                     );
         }
 
-        if (cleaned.startsWith("```")) {
+
+        if (
+                cleaned.startsWith(
+                        "```"
+                )
+        ) {
 
             cleaned =
                     cleaned.substring(
@@ -397,7 +645,12 @@ public class RequirementExtractionService {
                     );
         }
 
-        if (cleaned.endsWith("```")) {
+
+        if (
+                cleaned.endsWith(
+                        "```"
+                )
+        ) {
 
             cleaned =
                     cleaned.substring(
@@ -406,12 +659,13 @@ public class RequirementExtractionService {
                     );
         }
 
+
         return cleaned.trim();
     }
 
 
     /**
-     * Convert extracted DTO → database entity.
+     * Convert Gemini DTO into Requirement entity.
      */
     private Requirement createRequirementEntity(
             ExtractedRequirementResponse extracted,
@@ -422,59 +676,96 @@ public class RequirementExtractionService {
         Requirement requirement =
                 new Requirement();
 
+
+        /*
+         * Project ownership.
+         */
         requirement.setProjectId(
                 request.getProjectId()
         );
 
+
         /*
-         * Link the requirement to the extraction.
+         * Link requirement to the extraction.
          *
-         * Requirement.java contains:
+         * This creates:
          *
-         * private RequirementExtraction extraction;
-         *
-         * Therefore we set the entity relationship
-         * directly. JPA will store the extraction ID
-         * in the extraction_id column.
+         * requirements.extraction_id
          */
         requirement.setExtraction(
                 extraction
         );
 
+
+        /*
+         * Requirement code.
+         */
         requirement.setCode(
                 extracted.getCode()
         );
 
+
+        /*
+         * Requirement title.
+         */
         requirement.setTitle(
                 extracted.getTitle()
         );
 
+
+        /*
+         * Requirement description.
+         */
         requirement.setDescription(
                 extracted.getDescription()
         );
 
+
+        /*
+         * Requirement type.
+         */
         requirement.setType(
                 extracted.getType()
         );
 
+
+        /*
+         * Requirement priority.
+         */
         requirement.setPriority(
                 extracted.getPriority()
         );
 
+
+        /*
+         * Requirement lifecycle status.
+         */
         requirement.setStatus(
                 extracted.getStatus()
         );
 
+
+        /*
+         * AI confidence score.
+         */
         requirement.setConfidenceScore(
                 extracted.getConfidenceScore()
         );
+
 
         return requirement;
     }
 
 
     /**
-     * Convert database entity → DTO.
+     * Convert database Requirement entity
+     * into response DTO.
+     *
+     * IMPORTANT:
+     *
+     * This method includes requirement.getId(),
+     * so once the entity has been saved,
+     * the DTO contains the PostgreSQL-generated ID.
      */
     private ExtractedRequirementResponse toResponse(
             Requirement requirement

@@ -6,8 +6,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class ReqsyncBackendApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(ReqsyncBackendApplication.class, args);
-	}
+    public static void main(String[] args) {
 
+        SpringApplication.run(
+                ReqsyncBackendApplication.class,
+                args
+        );
+    }
 }
