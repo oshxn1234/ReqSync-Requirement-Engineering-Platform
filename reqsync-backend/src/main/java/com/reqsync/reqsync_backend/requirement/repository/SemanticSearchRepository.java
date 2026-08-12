@@ -6,45 +6,141 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-//@Repository
+@Repository
 public class SemanticSearchRepository {
 
     private final JdbcTemplate jdbcTemplate;
+
 
     public SemanticSearchRepository(
             JdbcTemplate jdbcTemplate
     ) {
 
-        this.jdbcTemplate = jdbcTemplate;
+        this.jdbcTemplate =
+                jdbcTemplate;
     }
 
+
+    /**
+     * Save or replace an embedding
+     * belonging to a requirement.
+     */
     public void updateEmbedding(
             Long requirementId,
             String vector
     ) {
 
-        String sql = """
+        String sql =
+                """
                 UPDATE requirements
                 SET embedding = CAST(? AS vector)
                 WHERE id = ?
                 """;
 
-        jdbcTemplate.update(
-                sql,
-                vector,
-                requirementId
-        );
+
+        int affectedRows =
+                jdbcTemplate.update(
+                        sql,
+                        vector,
+                        requirementId
+                );
+
+
+        if (affectedRows == 0) {
+
+            throw new RuntimeException(
+                    "Requirement not found while storing embedding: "
+                            + requirementId
+            );
+        }
     }
 
+
+    /**
+     * Search ALL requirements belonging to
+     * a project.
+     */
     public List<SimilarRequirementResponse>
-    searchProjectExceptSelected(
+    searchProject(
             Long projectId,
-            Long selectedRequirementId,
-            String vector,
+            String queryVector,
             int limit
     ) {
 
-        String sql = """
+        String sql =
+                """
+                SELECT
+                    id,
+                    requirement_code,
+                    title,
+                    description,
+                    1 - (
+                        embedding <=>
+                        CAST(? AS vector)
+                    ) AS similarity
+                FROM requirements
+                WHERE project_id = ?
+                  AND embedding IS NOT NULL
+                ORDER BY
+                    embedding <=>
+                    CAST(? AS vector)
+                LIMIT ?
+                """;
+
+
+        return jdbcTemplate.query(
+                sql,
+
+                (resultSet, rowNumber) ->
+                        new SimilarRequirementResponse(
+
+                                resultSet.getLong(
+                                        "id"
+                                ),
+
+                                resultSet.getString(
+                                        "requirement_code"
+                                ),
+
+                                resultSet.getString(
+                                        "title"
+                                ),
+
+                                resultSet.getString(
+                                        "description"
+                                ),
+
+                                resultSet.getDouble(
+                                        "similarity"
+                                )
+                        ),
+
+                queryVector,
+                projectId,
+                queryVector,
+                limit
+        );
+    }
+
+
+    /**
+     * Search other requirements within
+     * the same project while excluding
+     * one selected requirement.
+     *
+     * This is what completeness analysis
+     * will mainly use.
+     */
+    public List<SimilarRequirementResponse>
+    searchProjectExcludingRequirement(
+            Long projectId,
+            Long excludedRequirementId,
+            String queryVector,
+            int limit
+    ) {
+
+        String sql =
+                """
                 SELECT
                     id,
                     requirement_code,
@@ -64,80 +160,100 @@ public class SemanticSearchRepository {
                 LIMIT ?
                 """;
 
+
         return jdbcTemplate.query(
                 sql,
 
-                (rs, rowNum) ->
+                (resultSet, rowNumber) ->
                         new SimilarRequirementResponse(
-                                rs.getLong("id"),
-                                rs.getString(
+
+                                resultSet.getLong(
+                                        "id"
+                                ),
+
+                                resultSet.getString(
                                         "requirement_code"
                                 ),
-                                rs.getString("title"),
-                                rs.getString(
+
+                                resultSet.getString(
+                                        "title"
+                                ),
+
+                                resultSet.getString(
                                         "description"
                                 ),
-                                rs.getDouble(
+
+                                resultSet.getDouble(
                                         "similarity"
                                 )
                         ),
 
-                vector,
+                queryVector,
                 projectId,
-                selectedRequirementId,
-                vector,
+                excludedRequirementId,
+                queryVector,
                 limit
         );
     }
 
-    public List<SimilarRequirementResponse>
-    searchWholeProject(
-            Long projectId,
-            String vector,
-            int limit
+
+    /**
+     * Check whether a requirement already
+     * contains an embedding.
+     */
+    public boolean hasEmbedding(
+            Long requirementId
     ) {
 
-        String sql = """
-                SELECT
-                    id,
-                    requirement_code,
-                    title,
-                    description,
-                    1 - (
-                        embedding <=>
-                        CAST(? AS vector)
-                    ) AS similarity
+        String sql =
+                """
+                SELECT COUNT(*)
+                FROM requirements
+                WHERE id = ?
+                  AND embedding IS NOT NULL
+                """;
+
+
+        Integer count =
+                jdbcTemplate.queryForObject(
+                        sql,
+                        Integer.class,
+                        requirementId
+                );
+
+
+        return count != null
+                && count > 0;
+    }
+
+
+    /**
+     * Count how many requirements belonging
+     * to a project already contain embeddings.
+     */
+    public int countProjectEmbeddings(
+            Long projectId
+    ) {
+
+        String sql =
+                """
+                SELECT COUNT(*)
                 FROM requirements
                 WHERE project_id = ?
                   AND embedding IS NOT NULL
-                ORDER BY
-                    embedding <=>
-                    CAST(? AS vector)
-                LIMIT ?
                 """;
 
-        return jdbcTemplate.query(
-                sql,
 
-                (rs, rowNum) ->
-                        new SimilarRequirementResponse(
-                                rs.getLong("id"),
-                                rs.getString(
-                                        "requirement_code"
-                                ),
-                                rs.getString("title"),
-                                rs.getString(
-                                        "description"
-                                ),
-                                rs.getDouble(
-                                        "similarity"
-                                )
-                        ),
+        Integer count =
+                jdbcTemplate.queryForObject(
+                        sql,
+                        Integer.class,
+                        projectId
+                );
 
-                vector,
-                projectId,
-                vector,
-                limit
-        );
+
+        return count == null
+                ? 0
+                : count;
     }
 }

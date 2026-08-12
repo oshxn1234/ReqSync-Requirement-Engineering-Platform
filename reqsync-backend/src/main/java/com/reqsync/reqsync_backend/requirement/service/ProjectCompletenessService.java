@@ -122,9 +122,10 @@ public class ProjectCompletenessService {
             List<SimilarRequirementResponse>
                     matches =
                     semanticSearchService
-                            .searchWholeProject(
+                            .searchProject(
                                     projectId,
-                                    semanticQuery
+                                    semanticQuery,
+                                    5
                             );
 
 

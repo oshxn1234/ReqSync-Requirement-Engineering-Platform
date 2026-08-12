@@ -1,137 +1,301 @@
 package com.reqsync.reqsync_backend.requirement.service.semantic;
 
 import com.reqsync.reqsync_backend.ai.client.GeminiEmbeddingClient;
+import com.reqsync.reqsync_backend.requirement.entity.Requirement;
+import com.reqsync.reqsync_backend.requirement.repository.RequirementRepository;
 import com.reqsync.reqsync_backend.requirement.repository.SemanticSearchRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-//@Service
+import java.util.List;
+
+@Service
 public class RequirementEmbeddingService {
 
-    private final GeminiEmbeddingClient embeddingClient;
+    private final GeminiEmbeddingClient
+            geminiEmbeddingClient;
 
-    private final SemanticSearchRepository semanticSearchRepository;
+    private final SemanticSearchRepository
+            semanticSearchRepository;
+
+    private final RequirementRepository
+            requirementRepository;
 
 
     public RequirementEmbeddingService(
-            GeminiEmbeddingClient embeddingClient,
-            SemanticSearchRepository semanticSearchRepository
+            GeminiEmbeddingClient geminiEmbeddingClient,
+            SemanticSearchRepository semanticSearchRepository,
+            RequirementRepository requirementRepository
     ) {
 
-        this.embeddingClient = embeddingClient;
+        this.geminiEmbeddingClient =
+                geminiEmbeddingClient;
 
         this.semanticSearchRepository =
                 semanticSearchRepository;
+
+        this.requirementRepository =
+                requirementRepository;
     }
 
 
     /**
-     * Generate an embedding for a stored requirement
-     * and save the vector into PostgreSQL.
+     * Generate and save an embedding
+     * for ONE requirement.
      */
-    public void generateAndStore(
-            Long requirementId,
-            String text
+    @Transactional
+    public void generateAndStoreEmbedding(
+            Long requirementId
     ) {
 
-        if (requirementId == null) {
+        Requirement requirement =
+                requirementRepository
+                        .findById(
+                                requirementId
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new RuntimeException(
+                                                "Requirement not found: "
+                                                        + requirementId
+                                        )
+                        );
 
-            throw new IllegalArgumentException(
-                    "Requirement ID cannot be null."
-            );
-        }
 
-        if (text == null || text.isBlank()) {
-
-            throw new IllegalArgumentException(
-                    "Requirement text cannot be empty."
-            );
-        }
-
-
-        /*
-         * Gemini returns float[].
-         */
-        float[] embedding =
-                embeddingClient.generateEmbedding(
-                        text
+        String text =
+                buildRequirementText(
+                        requirement
                 );
 
 
-        /*
-         * Convert float[] into PostgreSQL vector syntax:
-         *
-         * [0.12,-0.47,0.85,...]
-         */
-        String vectorLiteral =
-                toVectorLiteral(
+        float[] embedding =
+                geminiEmbeddingClient
+                        .generateEmbedding(
+                                text
+                        );
+
+
+        String vector =
+                convertToVectorString(
                         embedding
                 );
 
 
-        /*
-         * Save vector to requirements.embedding.
-         */
-        semanticSearchRepository.updateEmbedding(
-                requirementId,
-                vectorLiteral
-        );
+        semanticSearchRepository
+                .updateEmbedding(
+                        requirementId,
+                        vector
+                );
     }
 
 
     /**
-     * Generate an embedding for search text.
+     * Generate embeddings for every
+     * requirement belonging to a project.
      *
-     * This vector is temporary and is NOT
-     * stored in PostgreSQL.
+     * This is useful for requirements that
+     * were already stored before semantic
+     * search was implemented.
      */
-    public String createSearchVector(
-            String text
+    @Transactional
+    public int generateProjectEmbeddings(
+            Long projectId
     ) {
 
-        if (text == null || text.isBlank()) {
+        List<Requirement> requirements =
+                requirementRepository
+                        .findByProjectId(
+                                projectId
+                        );
 
-            throw new IllegalArgumentException(
-                    "Search text cannot be empty."
+
+        if (requirements.isEmpty()) {
+
+            throw new RuntimeException(
+                    "No requirements found for project: "
+                            + projectId
             );
         }
 
-        float[] embedding =
-                embeddingClient.generateEmbedding(
-                        text
-                );
 
-        return toVectorLiteral(
+        int generatedCount = 0;
+
+
+        for (
+                Requirement requirement
+                : requirements
+        ) {
+
+            /*
+             * Avoid unnecessary Gemini calls
+             * if the embedding already exists.
+             */
+            if (
+                    semanticSearchRepository
+                            .hasEmbedding(
+                                    requirement.getId()
+                            )
+            ) {
+
+                continue;
+            }
+
+
+            String text =
+                    buildRequirementText(
+                            requirement
+                    );
+
+
+            float[] embedding =
+                    geminiEmbeddingClient
+                            .generateEmbedding(
+                                    text
+                            );
+
+
+            String vector =
+                    convertToVectorString(
+                            embedding
+                    );
+
+
+            semanticSearchRepository
+                    .updateEmbedding(
+                            requirement.getId(),
+                            vector
+                    );
+
+
+            generatedCount++;
+        }
+
+
+        return generatedCount;
+    }
+
+
+    /**
+     * Generate a temporary query embedding.
+     *
+     * This is NOT saved into PostgreSQL.
+     */
+    public String generateQueryVector(
+            String searchText
+    ) {
+
+        if (
+                searchText == null ||
+                        searchText.isBlank()
+        ) {
+
+            throw new IllegalArgumentException(
+                    "Semantic search text cannot be empty."
+            );
+        }
+
+
+        float[] embedding =
+                geminiEmbeddingClient
+                        .generateEmbedding(
+                                searchText
+                        );
+
+
+        return convertToVectorString(
                 embedding
         );
     }
 
 
     /**
-     * Convert float array into pgvector syntax.
+     * Construct meaningful text for
+     * semantic comparison.
+     *
+     * Both title and description are included.
      */
-    private String toVectorLiteral(
+    private String buildRequirementText(
+            Requirement requirement
+    ) {
+
+        StringBuilder text =
+                new StringBuilder();
+
+
+        if (
+                requirement.getTitle()
+                        != null
+        ) {
+
+            text.append(
+                    requirement.getTitle()
+            );
+
+            text.append(". ");
+        }
+
+
+        if (
+                requirement.getDescription()
+                        != null
+        ) {
+
+            text.append(
+                    requirement.getDescription()
+            );
+        }
+
+
+        return text.toString();
+    }
+
+
+    /**
+     * Convert:
+     *
+     * float[]
+     *
+     * into pgvector format:
+     *
+     * [0.12,-0.53,0.88,...]
+     */
+    private String convertToVectorString(
             float[] embedding
     ) {
 
         StringBuilder builder =
                 new StringBuilder();
 
-        builder.append("[");
 
-        for (int i = 0;
-             i < embedding.length;
-             i++) {
+        builder.append(
+                "["
+        );
 
-            if (i > 0) {
-                builder.append(",");
+
+        for (
+                int index = 0;
+                index < embedding.length;
+                index++
+        ) {
+
+            if (index > 0) {
+
+                builder.append(
+                        ","
+                );
             }
 
+
             builder.append(
-                    embedding[i]
+                    embedding[index]
             );
         }
 
-        builder.append("]");
+
+        builder.append(
+                "]"
+        );
+
 
         return builder.toString();
     }

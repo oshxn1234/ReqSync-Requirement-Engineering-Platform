@@ -1,51 +1,79 @@
 package com.reqsync.reqsync_backend.ai.client;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
 
-//@Component
+@Component
 public class GeminiEmbeddingClient {
 
     private final RestClient restClient;
 
-    @Value("${gemini.api.key}")
-    private String apiKey;
+    private final String model;
 
-    @Value("${gemini.embedding.model}")
-    private String model;
+    private final int dimension;
 
-    @Value("${gemini.embedding.dimension}")
-    private int dimension;
 
     public GeminiEmbeddingClient(
-            RestClient.Builder builder
+            RestClient.Builder builder,
+
+            @Value("${gemini.api.key}")
+            String apiKey,
+
+            @Value("${gemini.api.base-url}")
+            String baseUrl,
+
+            @Value("${gemini.embedding.model}")
+            String model,
+
+            @Value("${gemini.embedding.dimension}")
+            int dimension
     ) {
+
+        this.model = model;
+
+        this.dimension = dimension;
 
         this.restClient =
                 builder
-                        .baseUrl(
-                                "https://generativelanguage.googleapis.com"
+                        .baseUrl(baseUrl)
+                        .defaultHeader(
+                                "x-goog-api-key",
+                                apiKey
                         )
                         .build();
     }
 
+
+    /**
+     * Convert text into an embedding vector.
+     *
+     * The returned vector contains 768 values
+     * because our PostgreSQL column is vector(768).
+     */
     public float[] generateEmbedding(
             String text
     ) {
 
-        if (text == null ||
-                text.isBlank()) {
+        if (
+                text == null ||
+                        text.isBlank()
+        ) {
 
             throw new IllegalArgumentException(
-                    "Embedding text cannot be empty."
+                    "Text for embedding cannot be empty."
             );
         }
 
-        Map<String, Object> body =
+
+        /*
+         * Request sent to Gemini Embedding API.
+         */
+        Map<String, Object> requestBody =
                 Map.of(
 
                         "model",
@@ -62,73 +90,129 @@ public class GeminiEmbeddingClient {
                                 )
                         ),
 
+                        /*
+                         * We use SEMANTIC_SIMILARITY
+                         * because requirements will be
+                         * compared by meaning.
+                         */
+                        "taskType",
+                        "SEMANTIC_SIMILARITY",
+
+                        /*
+                         * Must match PostgreSQL
+                         * vector(768).
+                         */
                         "outputDimensionality",
                         dimension
                 );
 
-        Map response =
+
+        Map<String, Object> response =
                 restClient
                         .post()
                         .uri(
-                                "/v1beta/models/"
-                                        + model
-                                        + ":embedContent"
+                                "/models/{model}:embedContent",
+                                model
                         )
-                        .header(
-                                "x-goog-api-key",
-                                apiKey
+                        .contentType(
+                                MediaType.APPLICATION_JSON
                         )
-                        .body(body)
+                        .body(
+                                requestBody
+                        )
                         .retrieve()
-                        .body(Map.class);
+                        .body(
+                                Map.class
+                        );
+
 
         if (response == null) {
 
             throw new RuntimeException(
-                    "Embedding API returned no response."
+                    "Gemini Embedding API returned an empty response."
             );
         }
 
-        Map embedding =
-                (Map) response.get(
+
+        Object embeddingObject =
+                response.get(
                         "embedding"
                 );
 
-        if (embedding == null) {
+
+        if (
+                !(embeddingObject
+                        instanceof Map<?, ?> embedding)
+        ) {
 
             throw new RuntimeException(
-                    "Embedding response missing."
+                    "Gemini embedding response does not contain an embedding."
             );
         }
 
-        List<Number> values =
-                (List<Number>)
-                        embedding.get(
-                                "values"
-                        );
 
-        if (values == null ||
-                values.isEmpty()) {
+        Object valuesObject =
+                embedding.get(
+                        "values"
+                );
+
+
+        if (
+                !(valuesObject
+                        instanceof List<?> values)
+                        ||
+                        values.isEmpty()
+        ) {
 
             throw new RuntimeException(
-                    "Embedding values missing."
+                    "Gemini embedding response contains no values."
             );
         }
+
+
+        if (
+                values.size() != dimension
+        ) {
+
+            throw new RuntimeException(
+                    "Expected "
+                            + dimension
+                            + " embedding dimensions but received "
+                            + values.size()
+            );
+        }
+
 
         float[] result =
                 new float[
                         values.size()
                         ];
 
-        for (int i = 0;
-             i < values.size();
-             i++) {
+
+        for (
+                int i = 0;
+                i < values.size();
+                i++
+        ) {
+
+            Object value =
+                    values.get(i);
+
+
+            if (
+                    !(value instanceof Number number)
+            ) {
+
+                throw new RuntimeException(
+                        "Invalid value inside embedding vector."
+                );
+            }
+
 
             result[i] =
-                    values
-                            .get(i)
-                            .floatValue();
+                    number.floatValue();
         }
+
 
         return result;
     }

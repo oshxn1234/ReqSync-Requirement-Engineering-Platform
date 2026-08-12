@@ -150,10 +150,10 @@ public class RequirementCompletenessService {
             List<SimilarRequirementResponse>
                     semanticMatches =
                     semanticSearchService
-                            .searchForSelectedRequirement(
+                            .searchProject(
                                     projectId,
-                                    requirementId,
-                                    semanticQuery
+                                    semanticQuery,
+                                    5
                             );
 
 
