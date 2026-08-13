@@ -6,26 +6,26 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-//@Service
+@Service
 public class CompletenessScoreService {
 
     /**
-     * Calculate the final completeness percentage.
+     * PASS = 1
+     * PARTIAL = 0.5
+     * FAIL = 0
      *
-     * PASS    = 1 point
-     * PARTIAL = 0.5 point
-     * FAIL    = 0 point
-     *
-     * Each confirmed missing requirement
-     * reduces the score by 5 points.
+     * Confirmed missing gaps reduce
+     * the score by 5 points each.
      */
     public int calculate(
             List<CompletenessCriterionResponse> criteria,
             int confirmedMissingCount
     ) {
 
-        if (criteria == null ||
-                criteria.isEmpty()) {
+        if (
+                criteria == null ||
+                        criteria.isEmpty()
+        ) {
 
             return 0;
         }
@@ -39,8 +39,10 @@ public class CompletenessScoreService {
                 : criteria
         ) {
 
-            if (criterion == null ||
-                    criterion.getStatus() == null) {
+            if (
+                    criterion == null ||
+                            criterion.getStatus() == null
+            ) {
 
                 continue;
             }
@@ -60,10 +62,6 @@ public class CompletenessScoreService {
 
                 obtainedPoints += 0.5;
             }
-
-            /*
-             * FAIL contributes 0.
-             */
         }
 
 
@@ -82,24 +80,18 @@ public class CompletenessScoreService {
 
 
         /*
-         * Penalty only after semantic search
-         * confirms that the requirement is
-         * actually missing.
+         * Confirmed project gaps reduce score.
          */
         finalScore -=
                 confirmedMissingCount * 5;
 
 
-        /*
-         * Keep result within 0–100.
-         */
         if (finalScore < 0) {
-
             finalScore = 0;
         }
 
-        if (finalScore > 100) {
 
+        if (finalScore > 100) {
             finalScore = 100;
         }
 

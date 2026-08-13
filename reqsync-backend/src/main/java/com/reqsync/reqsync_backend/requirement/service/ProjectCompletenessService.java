@@ -2,7 +2,12 @@ package com.reqsync.reqsync_backend.requirement.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.reqsync.reqsync_backend.ai.client.GeminiClient;
-import com.reqsync.reqsync_backend.requirement.dto.*;
+import com.reqsync.reqsync_backend.project.repository.ProjectRepository;
+import com.reqsync.reqsync_backend.requirement.dto.CoverageCheckResponse;
+import com.reqsync.reqsync_backend.requirement.dto.InitialCompletenessResult;
+import com.reqsync.reqsync_backend.requirement.dto.PotentialGapResponse;
+import com.reqsync.reqsync_backend.requirement.dto.ProjectCompletenessResponse;
+import com.reqsync.reqsync_backend.requirement.dto.SimilarRequirementResponse;
 import com.reqsync.reqsync_backend.requirement.entity.Requirement;
 import com.reqsync.reqsync_backend.requirement.enums.CompletenessStatus;
 import com.reqsync.reqsync_backend.requirement.enums.CoverageStatus;
@@ -14,12 +19,19 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 
-//@Service
+@Service
 @Transactional(readOnly = true)
 public class ProjectCompletenessService {
 
+    private static final double
+            SIMILARITY_THRESHOLD = 0.70;
+
+
     private final RequirementRepository
             requirementRepository;
+
+    private final ProjectRepository
+            projectRepository;
 
     private final GeminiClient
             geminiClient;
@@ -36,6 +48,7 @@ public class ProjectCompletenessService {
 
     public ProjectCompletenessService(
             RequirementRepository requirementRepository,
+            ProjectRepository projectRepository,
             GeminiClient geminiClient,
             SemanticSearchService semanticSearchService,
             CompletenessScoreService completenessScoreService,
@@ -44,6 +57,9 @@ public class ProjectCompletenessService {
 
         this.requirementRepository =
                 requirementRepository;
+
+        this.projectRepository =
+                projectRepository;
 
         this.geminiClient =
                 geminiClient;
@@ -59,14 +75,30 @@ public class ProjectCompletenessService {
     }
 
 
+    /**
+     * Analyze all requirements belonging
+     * to a project.
+     */
     public ProjectCompletenessResponse analyzeProject(
             Long projectId
     ) {
 
         /*
-         * Retrieve ALL stored requirements
-         * for the project.
+         * Verify project exists.
          */
+        if (
+                !projectRepository.existsById(
+                        projectId
+                )
+        ) {
+
+            throw new RuntimeException(
+                    "Project not found: "
+                            + projectId
+            );
+        }
+
+
         List<Requirement> requirements =
                 requirementRepository
                         .findByProjectId(
@@ -74,7 +106,9 @@ public class ProjectCompletenessService {
                         );
 
 
-        if (requirements.isEmpty()) {
+        if (
+                requirements.isEmpty()
+        ) {
 
             throw new RuntimeException(
                     "No requirements found for project: "
@@ -84,7 +118,7 @@ public class ProjectCompletenessService {
 
 
         /*
-         * Analyze entire project requirement set.
+         * Initial project-wide analysis.
          */
         InitialCompletenessResult initialResult =
                 analyzeRequirementSet(
@@ -92,8 +126,41 @@ public class ProjectCompletenessService {
                 );
 
 
+        if (
+                initialResult.getCriteria()
+                        == null
+        ) {
+
+            initialResult.setCriteria(
+                    new ArrayList<>()
+            );
+        }
+
+
+        if (
+                initialResult.getPotentialGaps()
+                        == null
+        ) {
+
+            initialResult.setPotentialGaps(
+                    new ArrayList<>()
+            );
+        }
+
+
+        if (
+                initialResult.getSuggestions()
+                        == null
+        ) {
+
+            initialResult.setSuggestions(
+                    new ArrayList<>()
+            );
+        }
+
+
         List<CoverageCheckResponse>
-                coverageResults =
+                coverageChecks =
                 new ArrayList<>();
 
 
@@ -103,21 +170,38 @@ public class ProjectCompletenessService {
 
 
         /*
-         * Confirm every possible project-level gap.
+         * Verify each project-level gap using
+         * semantic search across all requirements.
          */
         for (
                 PotentialGapResponse gap
                 : initialResult.getPotentialGaps()
         ) {
 
+            if (
+                    gap == null ||
+                            gap.getDescription() == null ||
+                            gap.getDescription().isBlank()
+            ) {
+
+                continue;
+            }
+
+
+            String topic =
+                    gap.getTopic() == null
+                            ? "Potential Project Gap"
+                            : gap.getTopic();
+
+
             String semanticQuery =
-                    gap.getTopic()
+                    topic
                             + ". "
                             + gap.getDescription();
 
 
             /*
-             * Search ALL project requirements.
+             * Current SemanticSearchService method.
              */
             List<SimilarRequirementResponse>
                     matches =
@@ -136,7 +220,7 @@ public class ProjectCompletenessService {
                             .filter(
                                     match ->
                                             match.getSimilarity()
-                                                    >= 0.70
+                                                    >= SIMILARITY_THRESHOLD
                             )
                             .limit(3)
                             .toList();
@@ -158,14 +242,14 @@ public class ProjectCompletenessService {
             } else {
 
                 coverageResult =
-                        validateProjectCoverage(
+                        validateProjectCoverageWithGemini(
                                 gap,
                                 strongMatches
                         );
             }
 
 
-            coverageResults.add(
+            coverageChecks.add(
                     coverageResult
             );
 
@@ -182,26 +266,27 @@ public class ProjectCompletenessService {
         }
 
 
-        int completenessScore =
-                completenessScoreService.calculate(
-                        initialResult.getCriteria(),
-                        confirmedMissing.size()
-                );
+        int score =
+                completenessScoreService
+                        .calculate(
+                                initialResult.getCriteria(),
+                                confirmedMissing.size()
+                        );
 
 
         CompletenessStatus status =
-                determineCompletenessStatus(
-                        completenessScore
+                determineStatus(
+                        score
                 );
 
 
         return new ProjectCompletenessResponse(
                 projectId,
                 requirements.size(),
-                completenessScore,
+                score,
                 status,
                 initialResult.getCriteria(),
-                coverageResults,
+                coverageChecks,
                 confirmedMissing,
                 initialResult.getSuggestions()
         );
@@ -209,15 +294,14 @@ public class ProjectCompletenessService {
 
 
     /**
-     * Gemini receives ALL requirements
-     * belonging to the project.
+     * Gemini analyzes the entire requirement set.
      */
     private InitialCompletenessResult
     analyzeRequirementSet(
             List<Requirement> requirements
     ) {
 
-        StringBuilder requirementsText =
+        StringBuilder requirementContext =
                 new StringBuilder();
 
 
@@ -226,40 +310,51 @@ public class ProjectCompletenessService {
                 : requirements
         ) {
 
-            requirementsText
+            requirementContext
                     .append(
                             requirement.getCode()
                     )
-                    .append(" | ")
+                    .append(
+                            " | "
+                    )
+
                     .append(
                             requirement.getType()
                     )
-                    .append(" | ")
+                    .append(
+                            " | "
+                    )
+
                     .append(
                             requirement.getTitle()
                     )
-                    .append(" | ")
+                    .append(
+                            " | "
+                    )
+
                     .append(
                             requirement.getDescription()
                     )
-                    .append("\n");
+                    .append(
+                            "\n"
+                    );
         }
 
 
-        String prompt = """
-                You are a professional software
-                requirements engineering expert.
+        String prompt =
+                """
+                You are a professional software requirements
+                engineering expert.
 
-                Analyze the COMPLETE SET of project
-                requirements below as one system.
+                Analyze the COMPLETE SET of requirements below
+                as one software project.
 
                 Existing Requirements:
 
                 %s
 
 
-                Analyze overall project completeness
-                using:
+                Evaluate overall requirement completeness using:
 
                 FUNCTIONAL_COVERAGE
                 NON_FUNCTIONAL_COVERAGE
@@ -280,45 +375,45 @@ public class ProjectCompletenessService {
                 FAIL
 
 
-                Identify possible missing
-                requirement areas.
+                Also identify possible missing requirement areas.
 
                 IMPORTANT:
 
-                Do not assume a potential gap
-                is definitely missing.
+                Do not immediately assume that a possible gap
+                is truly missing.
 
-                ReqSync will search ALL stored
-                project requirements using
-                semantic search to validate
-                each gap.
+                ReqSync will perform semantic search across all
+                stored requirements to verify each possible gap.
 
+                Do not invent requirements unrelated to the
+                project.
 
-                Return ONLY JSON:
+                Return ONLY valid JSON.
+
+                Return exactly:
 
                 {
                   "criteria": [
                     {
                       "criterion": "FUNCTIONAL_COVERAGE",
                       "status": "PASS",
-                      "explanation": "..."
+                      "explanation": "Core workflows are represented."
                     }
                   ],
-
                   "potentialGaps": [
                     {
                       "topic": "Audit Logging",
-                      "description": "The system may require audit logging."
+                      "description": "The project may require audit logging for important administrative actions."
                     }
                   ],
-
                   "suggestions": [
-                    "..."
+                    "Define failure handling for payment processing."
                   ]
                 }
-                """.formatted(
-                requirementsText
-        );
+                """
+                        .formatted(
+                                requirementContext
+                        );
 
 
         String aiResponse =
@@ -339,7 +434,7 @@ public class ProjectCompletenessService {
         } catch (Exception exception) {
 
             throw new RuntimeException(
-                    "Unable to parse project completeness analysis.",
+                    "Unable to parse project completeness response.",
                     exception
             );
         }
@@ -347,7 +442,7 @@ public class ProjectCompletenessService {
 
 
     private CoverageCheckResponse
-    validateProjectCoverage(
+    validateProjectCoverageWithGemini(
             PotentialGapResponse gap,
             List<SimilarRequirementResponse> matches
     ) {
@@ -363,26 +458,51 @@ public class ProjectCompletenessService {
 
             context
                     .append(
+                            "Code: "
+                    )
+                    .append(
                             match.getCode()
                     )
-                    .append(" | ")
+                    .append(
+                            "\n"
+                    )
+
+                    .append(
+                            "Title: "
+                    )
                     .append(
                             match.getTitle()
                     )
-                    .append(" | ")
+                    .append(
+                            "\n"
+                    )
+
+                    .append(
+                            "Description: "
+                    )
                     .append(
                             match.getDescription()
                     )
-                    .append("\n");
+                    .append(
+                            "\n"
+                    )
+
+                    .append(
+                            "Similarity: "
+                    )
+                    .append(
+                            match.getSimilarity()
+                    )
+                    .append(
+                            "\n\n"
+                    );
         }
 
 
-        String prompt = """
-                Evaluate whether the potential
-                project requirement gap below
-                is already covered.
-
-                Potential Gap:
+        String prompt =
+                """
+                Determine whether the following possible
+                project requirement gap is already covered.
 
                 Topic:
                 %s
@@ -391,19 +511,29 @@ public class ProjectCompletenessService {
                 %s
 
 
-                Semantically related requirements:
+                Semantically related existing requirements:
 
                 %s
 
 
-                Classify as:
+                Classify the gap as:
 
                 COVERED
                 PARTIALLY_COVERED
                 MISSING
 
 
-                Return ONLY JSON:
+                COVERED means an existing requirement
+                adequately covers the concept.
+
+                PARTIALLY_COVERED means some coverage exists
+                but important details are still absent.
+
+                MISSING means none of the existing requirements
+                adequately covers it.
+
+
+                Return ONLY valid JSON:
 
                 {
                   "topic": "...",
@@ -411,11 +541,16 @@ public class ProjectCompletenessService {
                   "relatedRequirementCode": "REQ-001",
                   "reason": "..."
                 }
-                """.formatted(
-                gap.getTopic(),
-                gap.getDescription(),
-                context
-        );
+                """
+                        .formatted(
+                                safe(
+                                        gap.getTopic()
+                                ),
+                                safe(
+                                        gap.getDescription()
+                                ),
+                                context
+                        );
 
 
         String aiResponse =
@@ -436,7 +571,7 @@ public class ProjectCompletenessService {
         } catch (Exception exception) {
 
             throw new RuntimeException(
-                    "Unable to parse project coverage validation.",
+                    "Unable to parse project coverage response.",
                     exception
             );
         }
@@ -448,33 +583,16 @@ public class ProjectCompletenessService {
             PotentialGapResponse gap
     ) {
 
-        CoverageCheckResponse response =
-                new CoverageCheckResponse();
-
-
-        response.setTopic(
-                gap.getTopic()
+        return new CoverageCheckResponse(
+                gap.getTopic(),
+                CoverageStatus.MISSING,
+                null,
+                "No sufficiently similar requirement was found in the project."
         );
-
-        response.setStatus(
-                CoverageStatus.MISSING
-        );
-
-        response.setRelatedRequirementCode(
-                null
-        );
-
-        response.setReason(
-                "No sufficiently similar requirement exists in the project."
-        );
-
-
-        return response;
     }
 
 
-    private CompletenessStatus
-    determineCompletenessStatus(
+    private CompletenessStatus determineStatus(
             int score
     ) {
 
@@ -483,10 +601,12 @@ public class ProjectCompletenessService {
             return CompletenessStatus.COMPLETE;
         }
 
+
         if (score >= 60) {
 
             return CompletenessStatus.NEEDS_IMPROVEMENT;
         }
+
 
         return CompletenessStatus.INCOMPLETE;
     }
@@ -496,8 +616,10 @@ public class ProjectCompletenessService {
             String response
     ) {
 
-        if (response == null ||
-                response.isBlank()) {
+        if (
+                response == null ||
+                        response.isBlank()
+        ) {
 
             throw new RuntimeException(
                     "Gemini returned an empty response."
@@ -550,5 +672,15 @@ public class ProjectCompletenessService {
 
 
         return cleaned.trim();
+    }
+
+
+    private String safe(
+            String value
+    ) {
+
+        return value == null
+                ? ""
+                : value;
     }
 }
