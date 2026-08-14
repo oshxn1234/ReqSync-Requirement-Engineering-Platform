@@ -1,16 +1,24 @@
 package com.reqsync.reqsync_backend.auth.config;
 
 import com.reqsync.reqsync_backend.auth.service.CustomUserDetailsService;
+import com.reqsync.reqsync_backend.auth.security.JwtAuthenticationFilter;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -22,15 +30,21 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService userDetailsService;
 
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+
     public SecurityConfig(
-            CustomUserDetailsService userDetailsService
+            CustomUserDetailsService userDetailsService,
+            JwtAuthenticationFilter jwtAuthenticationFilter
     ) {
+
         this.userDetailsService = userDetailsService;
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
 
     // ==========================================
-    // Password hashing
+    // Password Encoder
     // ==========================================
 
     @Bean
@@ -45,10 +59,13 @@ public class SecurityConfig {
     // ==========================================
 
     @Bean
+
     public DaoAuthenticationProvider authenticationProvider() {
 
         DaoAuthenticationProvider provider =
-                new DaoAuthenticationProvider(userDetailsService);
+                new DaoAuthenticationProvider(
+                        userDetailsService
+                );
 
         provider.setPasswordEncoder(
                 passwordEncoder()
@@ -81,49 +98,62 @@ public class SecurityConfig {
     ) throws Exception {
 
         http
+
+                // Disable CSRF
                 .csrf(csrf -> csrf.disable())
 
-                .cors(cors -> cors.configurationSource(
-                        corsConfigurationSource()
-                ))
 
+                // Enable CORS
+                .cors(cors ->
+                        cors.configurationSource(
+                                corsConfigurationSource()
+                        )
+                )
+
+
+                // JWT does not use HTTP sessions
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS
+                        )
+                )
+
+
+                // API authorization rules
                 .authorizeHttpRequests(auth -> auth
 
+                        // Public endpoints
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/test"
                         ).permitAll()
 
+
+                        // Protected endpoints
                         .requestMatchers(
-                                "/api/auth/me",
-                                "/api/auth/logout"
+                                "/api/auth/me"
                         ).authenticated()
 
+
+                        // All other endpoints require JWT
                         .anyRequest().authenticated()
                 )
 
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(
-                                SessionCreationPolicy.IF_REQUIRED
-                        )
-                )
 
-                .logout(logout ->
-                        logout
-                                .logoutUrl("/api/auth/logout")
-                                .logoutSuccessHandler(
-                                        (request, response, authentication) -> {
-                                            response.setStatus(200);
-                                        }
-                                )
+                // Add JWT filter before
+                // UsernamePasswordAuthenticationFilter
+                .addFilterBefore(
+                        jwtAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class
                 );
+
 
         return http.build();
     }
 
 
     // ==========================================
-    // CORS
+    // CORS Configuration
     // ==========================================
 
     @Bean
@@ -132,11 +162,13 @@ public class SecurityConfig {
         CorsConfiguration configuration =
                 new CorsConfiguration();
 
+
         configuration.setAllowedOrigins(
                 List.of(
                         "http://localhost:3000"
                 )
         );
+
 
         configuration.setAllowedMethods(
                 List.of(
@@ -148,19 +180,28 @@ public class SecurityConfig {
                 )
         );
 
+
         configuration.setAllowedHeaders(
-                List.of("*")
+                List.of(
+                        "*"
+                )
         );
 
-        configuration.setAllowCredentials(true);
+
+        configuration.setAllowCredentials(
+                true
+        );
+
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
+
 
         source.registerCorsConfiguration(
                 "/**",
                 configuration
         );
+
 
         return source;
     }

@@ -2,10 +2,12 @@ package com.reqsync.reqsync_backend.auth.service;
 
 import com.reqsync.reqsync_backend.auth.entity.User;
 import com.reqsync.reqsync_backend.auth.repository.UserRepository;
+
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,11 +18,19 @@ public class CustomUserDetailsService
 
     private final UserRepository userRepository;
 
+
     public CustomUserDetailsService(
             UserRepository userRepository
     ) {
-        this.userRepository = userRepository;
+
+        this.userRepository =
+                userRepository;
     }
+
+
+    // ==========================================
+    // Load User
+    // ==========================================
 
     @Override
     public UserDetails loadUserByUsername(
@@ -36,18 +46,33 @@ public class CustomUserDetailsService
                                 )
                         );
 
+
         return org.springframework.security.core.userdetails.User
-                .withUsername(user.getEmail())
-                .password(user.getPassword())
+                .withUsername(
+                        user.getEmail()
+                )
+
+                .password(
+                        user.getPassword()
+                )
+
                 .authorities(
                         List.of(
                                 new SimpleGrantedAuthority(
-                                        "ROLE_" + user.getRole().name()
+                                        "ROLE_" +
+                                                user.getRole().name()
                                 )
                         )
                 )
-                .accountLocked(user.isAccountLocked())
-                .disabled(!user.isEnabled())
+
+                .accountLocked(
+                        user.isAccountLocked()
+                )
+
+                .disabled(
+                        !user.isEnabled()
+                )
+
                 .build();
     }
 }

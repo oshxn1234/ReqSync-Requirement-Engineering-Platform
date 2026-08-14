@@ -4,18 +4,18 @@ import com.reqsync.reqsync_backend.auth.dto.AuthResponse;
 import com.reqsync.reqsync_backend.auth.dto.LoginRequest;
 import com.reqsync.reqsync_backend.auth.entity.User;
 import com.reqsync.reqsync_backend.auth.repository.UserRepository;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import com.reqsync.reqsync_backend.auth.service.JwtService;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.security.web.context.SecurityContextRepository;
+
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -29,13 +29,13 @@ public class AuthController {
 
     private final UserRepository userRepository;
 
-    private final SecurityContextRepository securityContextRepository =
-            new HttpSessionSecurityContextRepository();
+    private final JwtService jwtService;
 
 
     public AuthController(
             AuthenticationManager authenticationManager,
-            UserRepository userRepository
+            UserRepository userRepository,
+            JwtService jwtService
     ) {
 
         this.authenticationManager =
@@ -43,6 +43,9 @@ public class AuthController {
 
         this.userRepository =
                 userRepository;
+
+        this.jwtService =
+                jwtService;
     }
 
 
@@ -65,11 +68,10 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(
-            @RequestBody LoginRequest request,
-            HttpServletRequest httpRequest,
-            HttpServletResponse httpResponse
+            @RequestBody LoginRequest request
     ) {
 
+        // Validate request
         if (request.getEmail() == null ||
                 request.getEmail().isBlank() ||
                 request.getPassword() == null ||
@@ -88,6 +90,10 @@ public class AuthController {
 
         try {
 
+            // ==========================================
+            // Authenticate user
+            // ==========================================
+
             Authentication authentication =
                     authenticationManager.authenticate(
                             new UsernamePasswordAuthenticationToken(
@@ -97,24 +103,20 @@ public class AuthController {
                     );
 
 
-            SecurityContext context =
-                    SecurityContextHolder.createEmptyContext();
+            // ==========================================
+            // Generate JWT
+            // ==========================================
 
-            context.setAuthentication(
-                    authentication
-            );
+            UserDetails userDetails =
+                    (UserDetails) authentication.getPrincipal();
 
-            SecurityContextHolder.setContext(
-                    context
-            );
+            String token =
+                    jwtService.generateToken(userDetails);
 
 
-            securityContextRepository.saveContext(
-                    context,
-                    httpRequest,
-                    httpResponse
-            );
-
+            // ==========================================
+            // Find user
+            // ==========================================
 
             User user =
                     userRepository
@@ -123,6 +125,10 @@ public class AuthController {
                             )
                             .orElseThrow();
 
+
+            // ==========================================
+            // Update login information
+            // ==========================================
 
             user.setLastLoginAt(
                     LocalDateTime.now()
@@ -133,12 +139,18 @@ public class AuthController {
             userRepository.save(user);
 
 
+            // ==========================================
+            // Return JWT + user information
+            // ==========================================
+
             return ResponseEntity.ok(
                     AuthResponse.from(
                             user,
+                            token,
                             "Login successful."
                     )
             );
+
 
         } catch (BadCredentialsException exception) {
 
@@ -155,7 +167,7 @@ public class AuthController {
 
 
     // ==========================================
-    // Current user
+    // Current User
     // ==========================================
 
     @GetMapping("/me")
@@ -188,6 +200,7 @@ public class AuthController {
         return ResponseEntity.ok(
                 AuthResponse.from(
                         user,
+                        null,
                         "Authenticated user."
                 )
         );
@@ -199,16 +212,17 @@ public class AuthController {
     // ==========================================
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(
-            HttpServletRequest request
-    ) {
+    public ResponseEntity<?> logout() {
+
+        /*
+         * JWT authentication is stateless.
+         *
+         * There is no HTTP session to invalidate.
+         * The frontend should remove the JWT token.
+         */
 
         SecurityContextHolder.clearContext();
 
-        if (request.getSession(false) != null) {
-
-            request.getSession(false).invalidate();
-        }
 
         return ResponseEntity.ok(
                 Map.of(

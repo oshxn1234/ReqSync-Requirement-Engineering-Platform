@@ -19,10 +19,9 @@ public class DataInitializer {
 
         return args -> {
 
-            String password =
-                    passwordEncoder.encode("password123");
+            String password = passwordEncoder.encode("password123");
 
-
+            // CEO
             createUserIfNotExists(
                     userRepository,
                     password,
@@ -32,7 +31,7 @@ public class DataInitializer {
                     Role.CEO
             );
 
-
+            // Project Manager
             createUserIfNotExists(
                     userRepository,
                     password,
@@ -42,7 +41,7 @@ public class DataInitializer {
                     Role.PROJECT_MANAGER
             );
 
-
+            // Business Analyst
             createUserIfNotExists(
                     userRepository,
                     password,
@@ -52,7 +51,7 @@ public class DataInitializer {
                     Role.BUSINESS_ANALYST
             );
 
-
+            // Developer
             createUserIfNotExists(
                     userRepository,
                     password,
@@ -62,7 +61,7 @@ public class DataInitializer {
                     Role.DEVELOPER
             );
 
-
+            // QA Engineer
             createUserIfNotExists(
                     userRepository,
                     password,
@@ -72,7 +71,7 @@ public class DataInitializer {
                     Role.QA_ENGINEER
             );
 
-
+            // Stakeholder
             createUserIfNotExists(
                     userRepository,
                     password,
@@ -83,7 +82,6 @@ public class DataInitializer {
             );
         };
     }
-
 
     private void createUserIfNotExists(
             UserRepository repository,
@@ -96,14 +94,13 @@ public class DataInitializer {
 
         if (!repository.existsByEmailIgnoreCase(email)) {
 
-            User user =
-                    new User(
-                            email,
-                            password,
-                            firstName,
-                            lastName,
-                            role
-                    );
+            User user = new User(
+                    email,
+                    password,
+                    firstName,
+                    lastName,
+                    role
+            );
 
             repository.save(user);
 
