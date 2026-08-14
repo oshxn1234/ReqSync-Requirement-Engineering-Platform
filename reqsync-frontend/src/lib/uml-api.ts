@@ -29,6 +29,34 @@ export interface UmlVersionRecord {
   createdAt?: string | null;
 }
 
+function getAuthToken(): string {
+  if (typeof window === 'undefined') {
+    throw new Error('Authentication is only available in the browser.');
+  }
+
+  const token = localStorage.getItem('reqsync_token');
+
+  if (!token) {
+    throw new Error('You are not authenticated. Please sign in again.');
+  }
+
+  return token;
+}
+
+function getAuthHeaders(
+  includeJsonContentType = false
+): HeadersInit {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${getAuthToken()}`,
+  };
+
+  if (includeJsonContentType) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  return headers;
+}
+
 async function getErrorMessage(response: Response) {
   const text = await response.text();
 
@@ -59,6 +87,7 @@ export async function generateUmlFromDatabase(
 
   const response = await fetch(url, {
     method: 'POST',
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {
@@ -75,6 +104,7 @@ export async function getProjectUmlDiagrams(
     `${API_BASE}/uml/project/${projectId}`,
     {
       method: 'GET',
+      headers: getAuthHeaders(),
     }
   );
 
@@ -92,6 +122,7 @@ export async function getLatestUml(
     `${API_BASE}/uml/${diagramId}`,
     {
       method: 'GET',
+      headers: getAuthHeaders(),
     }
   );
 
@@ -109,6 +140,7 @@ export async function getUmlVersions(
     `${API_BASE}/uml/${diagramId}/versions`,
     {
       method: 'GET',
+      headers: getAuthHeaders(),
     }
   );
 
@@ -127,9 +159,7 @@ export async function saveEditedUmlVersion(
     `${API_BASE}/uml/${diagramId}/versions`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(true),
       body: JSON.stringify({
         plantUmlCode,
       }),

@@ -118,6 +118,7 @@ export interface AppUser {
 }
 
 export interface ProjectSettings {
+  projectId: number;
   projectName: string;
   projectCode: string;
   description: string;
@@ -190,7 +191,7 @@ export const useProjectStore = create<ProjectState>()(
         {
           id: 'USR-000',
           name: 'Chief Executive Officer',
-          email: 'ceo@company.com',
+          email: 'ceo@reqsync.com',
           password: 'password123',
           role: 'CEO',
           skills: 'Executive Management, Business Strategy, Corporate Governance'
@@ -198,7 +199,7 @@ export const useProjectStore = create<ProjectState>()(
         {
           id: 'USR-001',
           name: 'Michael Brown',
-          email: 'michael.b@company.com',
+          email: 'michael@reqsync.com',
           password: 'password123',
           role: 'Project Manager',
           skills: 'Roadmapping, Agile, Backlog Grooming, QA Coordination'
@@ -206,7 +207,7 @@ export const useProjectStore = create<ProjectState>()(
         {
           id: 'USR-002',
           name: 'Sarah Johnson',
-          email: 'sarah.j@company.com',
+          email: 'sarah@reqsync.com',
           password: 'password123',
           role: 'Business Analyst',
           skills: 'Requirements Elicitation, SRS Design, Business Analysis'
@@ -214,7 +215,7 @@ export const useProjectStore = create<ProjectState>()(
         {
           id: 'USR-003',
           name: 'John Doe',
-          email: 'john.d@company.com',
+          email: 'john@reqsync.com',
           password: 'password123',
           role: 'Developer',
           skills: 'Next.js, React, Zustand, REST APIs, Cryptography'
@@ -222,7 +223,7 @@ export const useProjectStore = create<ProjectState>()(
         {
           id: 'USR-004',
           name: 'Emily Davis',
-          email: 'emily.d@company.com',
+          email: 'emily@reqsync.com',
           password: 'password123',
           role: 'QA Engineer',
           skills: 'Unit Testing, E2E Testing, Automation, Security Auditing'
@@ -230,7 +231,7 @@ export const useProjectStore = create<ProjectState>()(
         {
           id: 'USR-005',
           name: 'Alice Smith',
-          email: 'client@external.com',
+          email: 'alice@reqsync.com',
           password: 'password123',
           role: 'Stakeholder',
           skills: 'Business Requirements, Project Alignment, Executive Sponsor'
@@ -706,6 +707,7 @@ export const useProjectStore = create<ProjectState>()(
         }
       ],
       settings: {
+        projectId: 1,
         projectName: 'Online Banking System',
         projectCode: 'OBS-2026',
         description: 'Online banking system for retail customers including accounts, dashboards, fund transfers, and bill payments.',
@@ -713,12 +715,12 @@ export const useProjectStore = create<ProjectState>()(
         endDate: '2026-12-31',
         status: 'In Progress',
         teamMembers: [
-          { name: 'Chief Executive Officer', role: 'CEO', email: 'ceo@company.com', skills: 'Executive Management, Business Strategy, Corporate Governance' },
-          { name: 'Sarah Johnson', role: 'Lead Business Analyst', email: 'sarah.j@company.com', skills: 'Requirements Elicitation, SRS Design, Business Analysis' },
-          { name: 'John Doe', role: 'Senior Developer', email: 'john.d@company.com', skills: 'Next.js, React, Zustand, REST APIs, Cryptography' },
-          { name: 'Michael Brown', role: 'Product Manager', email: 'michael.b@company.com', skills: 'Roadmapping, Agile, Backlog Grooming, QA Coordination' },
-          { name: 'Emily Davis', role: 'QA Engineer', email: 'emily.d@company.com', skills: 'Unit Testing, E2E Testing, Automation, Security Auditing' },
-          { name: 'Alice Smith', role: 'Stakeholder / Client', email: 'client@external.com', skills: 'Business Requirements, Project Alignment, Executive Sponsor' }
+          { name: 'Chief Executive Officer', role: 'CEO', email: 'ceo@reqsync.com', skills: 'Executive Management, Business Strategy, Corporate Governance' },
+          { name: 'Sarah Johnson', role: 'Lead Business Analyst', email: 'sarah@reqsync.com', skills: 'Requirements Elicitation, SRS Design, Business Analysis' },
+          { name: 'John Doe', role: 'Senior Developer', email: 'john@reqsync.com', skills: 'Next.js, React, Zustand, REST APIs, Cryptography' },
+          { name: 'Michael Brown', role: 'Product Manager', email: 'michael@reqsync.com', skills: 'Roadmapping, Agile, Backlog Grooming, QA Coordination' },
+          { name: 'Emily Davis', role: 'QA Engineer', email: 'emily@reqsync.com', skills: 'Unit Testing, E2E Testing, Automation, Security Auditing' },
+          { name: 'Alice Smith', role: 'Stakeholder / Client', email: 'alice@reqsync.com', skills: 'Business Requirements, Project Alignment, Executive Sponsor' }
         ],
         companyName: 'Apex Financial Technologies LLC',
         companyRegNumber: 'TX-98218-A',
@@ -884,7 +886,7 @@ export const useProjectStore = create<ProjectState>()(
         let success = false;
         set((state) => {
           // Try to find the user in the current state
-          let user = state.users.find(
+          const user = state.users.find(
             (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
           );
 
@@ -895,7 +897,7 @@ export const useProjectStore = create<ProjectState>()(
               {
                 id: 'USR-000',
                 name: 'Chief Executive Officer',
-                email: 'ceo@company.com',
+                email: 'ceo@reqsync.com',
                 password: 'password123',
                 role: 'CEO' as const,
                 skills: 'Executive Management, Business Strategy, Corporate Governance'
@@ -903,7 +905,7 @@ export const useProjectStore = create<ProjectState>()(
               {
                 id: 'USR-001',
                 name: 'Michael Brown',
-                email: 'michael.b@company.com',
+                email: 'michael@reqsync.com',
                 password: 'password123',
                 role: 'Project Manager' as const,
                 skills: 'Roadmapping, Agile, Backlog Grooming, QA Coordination'
@@ -911,7 +913,7 @@ export const useProjectStore = create<ProjectState>()(
               {
                 id: 'USR-002',
                 name: 'Sarah Johnson',
-                email: 'sarah.j@company.com',
+                email: 'sarah@reqsync.com',
                 password: 'password123',
                 role: 'Business Analyst' as const,
                 skills: 'Requirements Elicitation, SRS Design, Business Analysis'
@@ -919,7 +921,7 @@ export const useProjectStore = create<ProjectState>()(
               {
                 id: 'USR-003',
                 name: 'John Doe',
-                email: 'john.d@company.com',
+                email: 'john@reqsync.com',
                 password: 'password123',
                 role: 'Developer' as const,
                 skills: 'Next.js, React, Zustand, REST APIs, Cryptography'
@@ -927,7 +929,7 @@ export const useProjectStore = create<ProjectState>()(
               {
                 id: 'USR-004',
                 name: 'Emily Davis',
-                email: 'emily.d@company.com',
+                email: 'emily@reqsync.com',
                 password: 'password123',
                 role: 'QA Engineer' as const,
                 skills: 'Unit Testing, E2E Testing, Automation, Security Auditing'
@@ -935,7 +937,7 @@ export const useProjectStore = create<ProjectState>()(
               {
                 id: 'USR-005',
                 name: 'Alice Smith',
-                email: 'client@external.com',
+                email: 'alice@reqsync.com',
                 password: 'password123',
                 role: 'Stakeholder' as const,
                 skills: 'Business Requirements, Project Alignment, Executive Sponsor'
@@ -1155,7 +1157,7 @@ export const useProjectStore = create<ProjectState>()(
             task.id === taskId
               ? {
                 ...task,
-                status: (passed ? 'Done' : 'In Progress') as any,
+                status: (passed ? 'Done' : 'In Progress') as Task['status'],
                 qaReview: {
                   reviewer,
                   comments,

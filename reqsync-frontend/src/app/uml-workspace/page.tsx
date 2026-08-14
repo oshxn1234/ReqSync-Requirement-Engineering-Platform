@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import Image from 'next/image';
 import { useProjectStore, UmlClass, UmlRelationship, UmlDiagramVersion } from '@/store/projectStore';
 import {
   generateUmlFromDatabase,
@@ -17,40 +18,31 @@ import {
   Plus, 
   Edit2, 
   Trash2, 
-  GitMerge, 
   FileText, 
   ArrowRight, 
-  Download, 
   Eye, 
-  RotateCw, 
   Network, 
   X, 
   RefreshCw, 
   Layers, 
   GitCompare, 
-  Code, 
   Check,
   Code2,
-  Calendar,
-  User,
   ShieldCheck,
-  ChevronRight
 } from 'lucide-react';
 
-const APPROVED_DEMO_PROJECTS = [
-  { id: 1, name: 'Online Banking System', code: 'OBS-2026' },
-  { id: 2, name: 'E-Commerce Portal', code: 'ECO-2025' },
-  { id: 3, name: 'HR Management System', code: 'HR-2026' },
-] as const;
-
 export default function UmlWorkspacePage() {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
-  const requirements = useProjectStore((state) => state.requirements);
   const baselines = useProjectStore((state) => state.baselines);
   const umlDiagramVersions = useProjectStore((state) => state.umlDiagramVersions);
   const currentUmlDiagram = useProjectStore((state) => state.currentUmlDiagram);
   const currentUser = useProjectStore((state) => state.currentUser);
+  const settings = useProjectStore((state) => state.settings);
 
   // Store Actions
   const addUmlClass = useProjectStore((state) => state.addUmlClass);
@@ -68,15 +60,18 @@ export default function UmlWorkspacePage() {
   const [copied, setCopied] = useState(false);
   const [backendUml, setBackendUml] = useState<UmlGenerationResponse | null>(null);
   const [showRenderedDiagram, setShowRenderedDiagram] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState<number>(1);
-  const [backendVersions, setBackendVersions] = useState<UmlVersionRecord[]>([]);
+  const [, setBackendVersions] = useState<UmlVersionRecord[]>([]);
   const [isSavingVersion, setIsSavingVersion] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [generationError, setGenerationError] = useState('');
 
-  const selectedProject =
-    APPROVED_DEMO_PROJECTS.find((project) => project.id === selectedProjectId) ??
-    APPROVED_DEMO_PROJECTS[0];
+  const projectId = settings.projectId ?? 1;
+
+  const selectedProject = {
+    id: projectId,
+    name: settings.projectName,
+    code: settings.projectCode,
+  };
 
   const canGenerate =
     currentUser?.role === 'Business Analyst' ||
@@ -86,6 +81,7 @@ export default function UmlWorkspacePage() {
   // Commit Baseline Modal
   const [showCommitModal, setShowCommitModal] = useState(false);
   const [selectedBaseline, setSelectedBaseline] = useState('');
+  const activeBaseline = selectedBaseline || baselines[0]?.version || '';
   const [commitDesc, setCommitDesc] = useState('');
 
   // Edit Class Modal
@@ -108,13 +104,6 @@ export default function UmlWorkspacePage() {
   // Comparison State
   const [compareWithVersion, setCompareWithVersion] = useState<string>('v1.0');
 
-  useEffect(() => {
-    setMounted(true);
-    // Auto-select first baseline if exists
-    if (baselines.length > 0) {
-      setSelectedBaseline(baselines[0].version);
-    }
-  }, [baselines]);
 
 
   useEffect(() => {
@@ -129,7 +118,7 @@ export default function UmlWorkspacePage() {
         setBackendVersions([]);
         setIsDirty(false);
 
-        const diagrams = await getProjectUmlDiagrams(selectedProjectId);
+        const diagrams = await getProjectUmlDiagrams(projectId);
 
         if (cancelled) return;
 
@@ -197,7 +186,7 @@ export default function UmlWorkspacePage() {
     return () => {
       cancelled = true;
     };
-  }, [mounted, selectedProjectId]);
+  }, [mounted, projectId]);
 
   if (!mounted) {
     return (
@@ -454,8 +443,8 @@ export default function UmlWorkspacePage() {
   // Save baseline snapshot link
   const handleCommitBaseline = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedBaseline || !commitDesc.trim()) return;
-    commitUmlToBaseline(selectedBaseline, commitDesc);
+    if (!activeBaseline || !commitDesc.trim()) return;
+    commitUmlToBaseline(activeBaseline, commitDesc);
     setShowCommitModal(false);
     setCommitDesc('');
   };
@@ -554,17 +543,13 @@ export default function UmlWorkspacePage() {
             </p>
 
             <select
-              value={selectedProjectId}
-              onChange={(event) =>
-                setSelectedProjectId(Number(event.target.value))
-              }
-              className="mt-1 min-w-64 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-blue-500 focus:bg-white"
+              value={projectId}
+              disabled
+              className="mt-1 min-w-64 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-800 outline-none disabled:cursor-default disabled:opacity-100"
             >
-              {APPROVED_DEMO_PROJECTS.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name} ({project.code})
-                </option>
-              ))}
+              <option value={projectId}>
+                {settings.projectName} ({settings.projectCode})
+              </option>
             </select>
           </div>
 
@@ -574,7 +559,7 @@ export default function UmlWorkspacePage() {
 
           {backendUml && (
             <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-blue-700">
-              Diagram #{backendUml.diagramId} · Version {backendUml.versionNumber}
+              Diagram #{backendUml.diagramId} - Version {backendUml.versionNumber}
             </span>
           )}
 
@@ -928,7 +913,7 @@ export default function UmlWorkspacePage() {
                   Generated UML Class Diagram
                 </h3>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  {selectedProject.name} · Diagram #{backendUml.diagramId} · Version {backendUml.versionNumber}
+                  {selectedProject.name} - Diagram #{backendUml.diagramId} - Version {backendUml.versionNumber}
                 </p>
               </div>
 
@@ -942,11 +927,14 @@ export default function UmlWorkspacePage() {
 
             <div className="p-6 bg-slate-100 overflow-auto max-h-[75vh]">
               <div className="bg-white rounded-2xl border border-slate-200 p-4 min-h-[300px] flex items-center justify-center">
-                <img
-                  src={`data:image/svg+xml;base64,${backendUml.svgBase64}`}
-                  alt="Generated UML Class Diagram"
-                  className="max-w-full h-auto"
-                />
+                <Image
+  src={`data:image/svg+xml;base64,${backendUml.svgBase64}`}
+  alt="Generated UML Class Diagram"
+  width={1200}
+  height={800}
+  unoptimized
+  className="max-w-full h-auto"
+/>
               </div>
             </div>
 
@@ -1059,7 +1047,7 @@ export default function UmlWorkspacePage() {
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Target Requirement Baseline</label>
                   <select
-                    value={selectedBaseline}
+                    value={activeBaseline}
                     onChange={(e) => setSelectedBaseline(e.target.value)}
                     className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:border-blue-500 bg-white"
                   >
@@ -1279,7 +1267,7 @@ export default function UmlWorkspacePage() {
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Relationship Type</label>
                   <select
                     value={relType}
-                    onChange={(e) => setRelType(e.target.value as any)}
+                    onChange={(e) => setRelType(e.target.value as UmlRelationship['type'])}
                     className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:border-blue-500 bg-white"
                   >
                     <option value="Association">Association</option>
