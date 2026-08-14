@@ -192,6 +192,13 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- PlantUML rendering -->
+        <dependency>
+            <groupId>net.sourceforge.plantuml</groupId>
+            <artifactId>plantuml-lgpl</artifactId>
+            <version>1.2026.6</version>
+        </dependency>
+
 
     </dependencies>
 

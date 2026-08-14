@@ -1,43 +1,50 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import Image from 'next/image';
 import { useProjectStore, UmlClass, UmlRelationship, UmlDiagramVersion } from '@/store/projectStore';
+import {
+  generateUmlFromDatabase,
+  getLatestUml,
+  getProjectUmlDiagrams,
+  getUmlVersions,
+  saveEditedUmlVersion,
+  type UmlGenerationResponse,
+  type UmlVersionRecord,
+} from '@/lib/uml-api';
+import { parsePlantUmlToWorkspace } from '@/lib/plantuml-parser';
 import { 
   Sparkles, 
   Plus, 
   Edit2, 
   Trash2, 
-  GitMerge, 
   FileText, 
   ArrowRight, 
-  Download, 
   Eye, 
-  RotateCw, 
   Network, 
   X, 
   RefreshCw, 
   Layers, 
   GitCompare, 
-  Code, 
   Check,
   Code2,
-  Calendar,
-  User,
   ShieldCheck,
-  ChevronRight
 } from 'lucide-react';
 
 export default function UmlWorkspacePage() {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
-  const requirements = useProjectStore((state) => state.requirements);
   const baselines = useProjectStore((state) => state.baselines);
   const umlDiagramVersions = useProjectStore((state) => state.umlDiagramVersions);
   const currentUmlDiagram = useProjectStore((state) => state.currentUmlDiagram);
   const currentUser = useProjectStore((state) => state.currentUser);
+  const settings = useProjectStore((state) => state.settings);
 
   // Store Actions
-  const generateUmlFromRequirements = useProjectStore((state) => state.generateUmlFromRequirements);
   const addUmlClass = useProjectStore((state) => state.addUmlClass);
   const updateUmlClass = useProjectStore((state) => state.updateUmlClass);
   const deleteUmlClass = useProjectStore((state) => state.deleteUmlClass);
@@ -51,10 +58,30 @@ export default function UmlWorkspacePage() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'mermaid' | 'plantuml'>('mermaid');
   const [copied, setCopied] = useState(false);
+  const [backendUml, setBackendUml] = useState<UmlGenerationResponse | null>(null);
+  const [showRenderedDiagram, setShowRenderedDiagram] = useState(false);
+  const [, setBackendVersions] = useState<UmlVersionRecord[]>([]);
+  const [isSavingVersion, setIsSavingVersion] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [generationError, setGenerationError] = useState('');
+
+  const projectId = settings.projectId ?? 1;
+
+  const selectedProject = {
+    id: projectId,
+    name: settings.projectName,
+    code: settings.projectCode,
+  };
+
+  const canGenerate =
+    currentUser?.role === 'Business Analyst' ||
+    currentUser?.role === 'Project Manager';
+
 
   // Commit Baseline Modal
   const [showCommitModal, setShowCommitModal] = useState(false);
   const [selectedBaseline, setSelectedBaseline] = useState('');
+  const activeBaseline = selectedBaseline || baselines[0]?.version || '';
   const [commitDesc, setCommitDesc] = useState('');
 
   // Edit Class Modal
@@ -77,13 +104,89 @@ export default function UmlWorkspacePage() {
   // Comparison State
   const [compareWithVersion, setCompareWithVersion] = useState<string>('v1.0');
 
+
+
   useEffect(() => {
-    setMounted(true);
-    // Auto-select first baseline if exists
-    if (baselines.length > 0) {
-      setSelectedBaseline(baselines[0].version);
-    }
-  }, [baselines]);
+    if (!mounted) return;
+
+    let cancelled = false;
+
+    const loadSelectedProjectUml = async () => {
+      try {
+        setGenerationError('');
+        setBackendUml(null);
+        setBackendVersions([]);
+        setIsDirty(false);
+
+        const diagrams = await getProjectUmlDiagrams(projectId);
+
+        if (cancelled) return;
+
+        if (diagrams.length === 0) {
+          useProjectStore.setState({
+            currentUmlDiagram: {
+              classes: [],
+              relationships: [],
+            },
+            umlDiagramVersions: [],
+          });
+          setCompareWithVersion('');
+          return;
+        }
+
+        const latest = await getLatestUml(diagrams[0].diagramId);
+
+        if (cancelled) return;
+
+        const parsed = parsePlantUmlToWorkspace(latest.plantUmlCode);
+
+        useProjectStore.setState({
+          currentUmlDiagram: parsed,
+        });
+
+        setBackendUml(latest);
+
+        const versions = await getUmlVersions(latest.diagramId);
+
+        if (cancelled) return;
+
+        setBackendVersions(versions);
+
+        const previousVersions: UmlDiagramVersion[] = versions
+          .filter((version) => version.versionNumber < latest.versionNumber)
+          .map((version) => {
+            const parsedVersion = parsePlantUmlToWorkspace(version.plantUmlCode);
+
+            return {
+              version: `v${version.versionNumber}`,
+              baselineVersion: `v${version.versionNumber}`,
+              description: `${version.source ?? 'AI'} UML version ${version.versionNumber}`,
+              createdAt: version.createdAt?.slice(0, 10) ?? '',
+              classes: parsedVersion.classes,
+              relationships: parsedVersion.relationships,
+            };
+          });
+
+        useProjectStore.setState({
+          umlDiagramVersions: previousVersions,
+        });
+
+        setCompareWithVersion(
+          previousVersions[0]?.baselineVersion ??
+          previousVersions[0]?.version ??
+          ''
+        );
+      } catch (error) {
+        console.warn('Could not load saved UML for selected project:', error);
+      }
+    };
+
+    void loadSelectedProjectUml();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted, projectId]);
 
   if (!mounted) {
     return (
@@ -93,13 +196,77 @@ export default function UmlWorkspacePage() {
     );
   }
 
-  // Trigger AI generation
-  const handleAiGenerate = () => {
+  const refreshBackendHistory = async (
+    diagramId: number,
+    currentVersion: number
+  ) => {
+    const versions = await getUmlVersions(diagramId);
+    setBackendVersions(versions);
+
+    const previousVersions: UmlDiagramVersion[] = versions
+      .filter((version) => version.versionNumber < currentVersion)
+      .map((version) => {
+        const parsedVersion = parsePlantUmlToWorkspace(version.plantUmlCode);
+
+        return {
+          version: `v${version.versionNumber}`,
+          baselineVersion: `v${version.versionNumber}`,
+          description: `${version.source ?? 'AI'} UML version ${version.versionNumber}`,
+          createdAt: version.createdAt?.slice(0, 10) ?? '',
+          classes: parsedVersion.classes,
+          relationships: parsedVersion.relationships,
+        };
+      });
+
+    useProjectStore.setState({
+      umlDiagramVersions: previousVersions,
+    });
+
+    setCompareWithVersion(
+      previousVersions[0]?.baselineVersion ??
+      previousVersions[0]?.version ??
+      ''
+    );
+  };
+
+  // REAL FLOW:
+  // selected approved project -> DB extracted requirements -> Gemini -> PlantUML -> UI
+  const handleAiGenerate = async () => {
     setIsGenerating(true);
-    setTimeout(() => {
-      generateUmlFromRequirements();
+    setGenerationError('');
+
+    try {
+      const result = await generateUmlFromDatabase(
+        selectedProject.id,
+        selectedProject.name
+      );
+
+      const parsedDiagram = parsePlantUmlToWorkspace(result.plantUmlCode);
+
+      useProjectStore.setState({
+        currentUmlDiagram: parsedDiagram,
+      });
+
+      setBackendUml(result);
+      setIsDirty(false);
+
+      await refreshBackendHistory(
+        result.diagramId,
+        result.versionNumber
+      );
+    } catch (error) {
+      console.error('UML generation failed:', error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to generate UML diagram.';
+
+      setGenerationError(message);
+      window.alert(message);
+    } finally {
       setIsGenerating(false);
-    }, 1500);
+    }
   };
 
   // Export Code Formatting
@@ -129,6 +296,12 @@ export default function UmlWorkspacePage() {
   };
 
   const getPlantUmlCode = () => {
+    // Use the exact PlantUML returned by Spring Boot/Gemini when available.
+    if (backendUml?.plantUmlCode && !isDirty) {
+      return backendUml.plantUmlCode;
+    }
+
+    // Fallback for manually-created local UML data.
     let code = "@startuml\n\n";
     currentUmlDiagram.classes.forEach(c => {
       code += `class ${c.name} {\n`;
@@ -166,6 +339,7 @@ export default function UmlWorkspacePage() {
     e.preventDefault();
     if (!newClassName.trim()) return;
     addUmlClass(newClassName.trim());
+    setIsDirty(true);
     setNewClassName('');
     setShowAddClassModal(false);
   };
@@ -193,6 +367,7 @@ export default function UmlWorkspacePage() {
       methods
     });
 
+    setIsDirty(true);
     setShowEditClassModal(false);
     setEditingClass(null);
   };
@@ -202,16 +377,74 @@ export default function UmlWorkspacePage() {
     e.preventDefault();
     if (!relSource || !relTarget || relSource === relTarget) return;
     addUmlRelationship(relSource, relTarget, relType);
+    setIsDirty(true);
     setShowAddRelModal(false);
     setRelSource('');
     setRelTarget('');
   };
 
+  const handleDeleteClass = (classId: string) => {
+    deleteUmlClass(classId);
+    setIsDirty(true);
+  };
+
+  const handleDeleteRelationship = (relationshipId: string) => {
+    deleteUmlRelationship(relationshipId);
+    setIsDirty(true);
+  };
+
+  const handleSaveAsNewVersion = async () => {
+    if (!backendUml) {
+      window.alert('Generate a class diagram first.');
+      return;
+    }
+
+    try {
+      setIsSavingVersion(true);
+      setGenerationError('');
+
+      const plantUmlCode = getPlantUmlCode();
+
+      const saved = await saveEditedUmlVersion(
+        backendUml.diagramId,
+        plantUmlCode
+      );
+
+      const parsed = parsePlantUmlToWorkspace(saved.plantUmlCode);
+
+      useProjectStore.setState({
+        currentUmlDiagram: parsed,
+      });
+
+      setBackendUml(saved);
+      setIsDirty(false);
+
+      await refreshBackendHistory(
+        saved.diagramId,
+        saved.versionNumber
+      );
+
+      window.alert(
+        `Changes saved successfully as UML version ${saved.versionNumber}.`
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to save UML version.';
+
+      setGenerationError(message);
+      window.alert(message);
+    } finally {
+      setIsSavingVersion(false);
+    }
+  };
+
   // Save baseline snapshot link
   const handleCommitBaseline = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedBaseline || !commitDesc.trim()) return;
-    commitUmlToBaseline(selectedBaseline, commitDesc);
+    if (!activeBaseline || !commitDesc.trim()) return;
+    commitUmlToBaseline(activeBaseline, commitDesc);
     setShowCommitModal(false);
     setCommitDesc('');
   };
@@ -260,7 +493,7 @@ export default function UmlWorkspacePage() {
         </div>
 
         <div className="flex flex-wrap gap-2.5">
-          {currentUser?.role !== 'CEO' && (
+          {canGenerate && (
             <button
               onClick={handleAiGenerate}
               disabled={isGenerating}
@@ -274,7 +507,7 @@ export default function UmlWorkspacePage() {
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 text-white" />
-                  <span>Generate from Specs</span>
+                  <span>Generate Class Diagram</span>
                 </>
               )}
             </button>
@@ -299,6 +532,83 @@ export default function UmlWorkspacePage() {
           )}
         </div>
       </div>
+
+      {/* UML-only approved project selector.
+          This does not change the shared Header component used by the team. */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-2xs">
+        <div className="flex flex-wrap items-center gap-3">
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+              Approved Project for UML
+            </p>
+
+            <select
+              value={projectId}
+              disabled
+              className="mt-1 min-w-64 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-800 outline-none disabled:cursor-default disabled:opacity-100"
+            >
+              <option value={projectId}>
+                {settings.projectName} ({settings.projectCode})
+              </option>
+            </select>
+          </div>
+
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-emerald-700">
+            Approved
+          </span>
+
+          {backendUml && (
+            <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-blue-700">
+              Diagram #{backendUml.diagramId} - Version {backendUml.versionNumber}
+            </span>
+          )}
+
+          {isDirty && (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-amber-700">
+              Unsaved UML changes
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {!canGenerate && (
+            <span className="text-[10px] font-semibold text-slate-400">
+              View-only role. Use Business Analyst or Project Manager to generate.
+            </span>
+          )}
+
+          {backendUml && (
+            <button
+              onClick={() => setShowRenderedDiagram(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[10px] font-bold text-slate-700 transition-all hover:bg-slate-50"
+            >
+              <Eye className="h-3.5 w-3.5 text-blue-600" />
+              View Diagram
+            </button>
+          )}
+
+          {currentUser?.role === 'Business Analyst' && backendUml && (
+            <button
+              onClick={handleSaveAsNewVersion}
+              disabled={isSavingVersion}
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-[10px] font-bold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {isSavingVersion ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ShieldCheck className="h-3.5 w-3.5" />
+              )}
+              Save Update as New Version
+            </button>
+          )}
+        </div>
+      </div>
+
+      {generationError && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+          {generationError}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200">
@@ -383,7 +693,7 @@ export default function UmlWorkspacePage() {
                             <Edit2 className="w-3 h-3" />
                           </button>
                           <button
-                            onClick={() => deleteUmlClass(cls.id)}
+                            onClick={() => handleDeleteClass(cls.id)}
                             className="p-1 hover:bg-slate-800 text-rose-400 rounded transition-colors cursor-pointer"
                             title="Delete class"
                           >
@@ -427,53 +737,66 @@ export default function UmlWorkspacePage() {
           </div>
 
           {/* Relationship Sidebar Manager */}
-          <div className="lg:col-span-1 bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs flex flex-col justify-between">
-            <div className="space-y-4 flex-grow">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest pb-3 border-b border-slate-100">
-                Relationship Matrix
-              </h3>
-              
-              {currentUmlDiagram.relationships.length === 0 ? (
-                <div className="text-center py-10 text-slate-400 text-xs italic">
-                  No relationships established.
-                </div>
-              ) : (
-                <div className="space-y-2.5 overflow-y-auto max-h-[380px] pr-1.5 scrollbar-thin">
-                  {currentUmlDiagram.relationships.map((rel) => {
-                    const src = currentUmlDiagram.classes.find(c => c.id === rel.sourceClassId)?.name || 'Unknown';
-                    const tgt = currentUmlDiagram.classes.find(c => c.id === rel.targetClassId)?.name || 'Unknown';
-                    return (
-                      <div key={rel.id} className="border border-slate-150 p-2.5 rounded-xl text-[11px] hover:border-slate-350 transition-colors flex items-center justify-between gap-3 bg-slate-50/50">
-                        <div className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-1 font-semibold text-slate-800">
-                            <span>{src}</span>
-                            <ArrowRight className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span>{tgt}</span>
-                          </div>
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50/80 border border-blue-100 px-1.5 py-0.5 rounded w-fit mt-1">
-                            {rel.type}
-                          </span>
+          <div className="lg:col-span-1 self-start bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs flex flex-col">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest pb-3 border-b border-slate-100">
+              Relationship Matrix
+            </h3>
+
+            {currentUmlDiagram.relationships.length === 0 ? (
+              <div className="text-center py-10 text-slate-400 text-xs italic">
+                No relationships established.
+              </div>
+            ) : (
+              <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1.5 mt-4 scrollbar-thin">
+                {currentUmlDiagram.relationships.map((rel) => {
+                  const src =
+                    currentUmlDiagram.classes.find(
+                      (c) => c.id === rel.sourceClassId
+                    )?.name || 'Unknown';
+
+                  const tgt =
+                    currentUmlDiagram.classes.find(
+                      (c) => c.id === rel.targetClassId
+                    )?.name || 'Unknown';
+
+                  return (
+                    <div
+                      key={rel.id}
+                      className="border border-slate-200 p-3 rounded-xl text-[11px] hover:border-slate-400 transition-colors flex items-center justify-between gap-3 bg-slate-50/50"
+                    >
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <div className="flex items-center gap-1 font-semibold text-slate-800">
+                          <span className="truncate">{src}</span>
+
+                          <ArrowRight className="w-3 h-3 text-slate-400 shrink-0" />
+
+                          <span className="truncate">{tgt}</span>
                         </div>
-                        {currentUser?.role === 'Business Analyst' && (
-                          <button
-                            onClick={() => deleteUmlRelationship(rel.id)}
-                            className="text-slate-400 hover:text-rose-600 p-1 hover:bg-slate-100 rounded transition-colors cursor-pointer shrink-0"
-                            title="Remove link"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded w-fit">
+                          {rel.type}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+
+                      {currentUser?.role === 'Business Analyst' && (
+                        <button
+                          onClick={() => handleDeleteRelationship(rel.id)}
+                          className="text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                          title="Remove Relationship"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {currentUser?.role === 'Business Analyst' && (
               <button
                 onClick={() => setShowAddRelModal(true)}
-                className="w-full flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-3 text-xs font-bold transition-all shadow-xs cursor-pointer mt-4 shrink-0"
+                className="w-full flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-3 text-xs font-bold transition-all shadow-xs cursor-pointer mt-4"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Relationship</span>
@@ -486,8 +809,8 @@ export default function UmlWorkspacePage() {
         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-100">
             <div>
-              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Baseline Difference Analyzer</h2>
-              <p className="text-xs text-slate-400 mt-1">Select a stored requirement baseline version snapshot to compare with current active design.</p>
+              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Version Difference Analyzer</h2>
+              <p className="text-xs text-slate-400 mt-1">Compare the current active class diagram with a previous UML version stored in the database.</p>
             </div>
             
             <div className="flex items-center gap-2">
@@ -502,7 +825,7 @@ export default function UmlWorkspacePage() {
                 ) : (
                   umlDiagramVersions.map((ver) => (
                     <option key={ver.baselineVersion} value={ver.baselineVersion}>
-                      {ver.version} ({ver.baselineVersion})
+                      {ver.version} - {ver.description}
                     </option>
                   ))
                 )}
@@ -512,7 +835,7 @@ export default function UmlWorkspacePage() {
 
           {!selectedVersionData ? (
             <div className="text-center py-20 text-slate-400 italic text-xs">
-              No historical UML diagram snapshots exist yet for baseline comparison. Commit a snapshot to create one.
+              No previous UML versions exist yet. Generate again after requirement changes, or edit the diagram and save it as a new version.
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -577,6 +900,53 @@ export default function UmlWorkspacePage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Generated SVG Preview - UML feature only */}
+      {showRenderedDiagram && backendUml && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-5xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="font-extrabold text-slate-800 text-sm tracking-wide">
+                  Generated UML Class Diagram
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {selectedProject.name} - Diagram #{backendUml.diagramId} - Version {backendUml.versionNumber}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowRenderedDiagram(false)}
+                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 bg-slate-100 overflow-auto max-h-[75vh]">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 min-h-[300px] flex items-center justify-center">
+                <Image
+  src={`data:image/svg+xml;base64,${backendUml.svgBase64}`}
+  alt="Generated UML Class Diagram"
+  width={1200}
+  height={800}
+  unoptimized
+  className="max-w-full h-auto"
+/>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button
+                onClick={() => setShowRenderedDiagram(false)}
+                className="border border-slate-200 px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-200 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -677,7 +1047,7 @@ export default function UmlWorkspacePage() {
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Target Requirement Baseline</label>
                   <select
-                    value={selectedBaseline}
+                    value={activeBaseline}
                     onChange={(e) => setSelectedBaseline(e.target.value)}
                     className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:border-blue-500 bg-white"
                   >
@@ -897,7 +1267,7 @@ export default function UmlWorkspacePage() {
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Relationship Type</label>
                   <select
                     value={relType}
-                    onChange={(e) => setRelType(e.target.value as any)}
+                    onChange={(e) => setRelType(e.target.value as UmlRelationship['type'])}
                     className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:border-blue-500 bg-white"
                   >
                     <option value="Association">Association</option>

@@ -1,47 +1,85 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { useProjectStore } from '@/store/projectStore';
 import Link from 'next/link';
-import { Sparkles, ArrowRight, ShieldCheck, Mail, Lock, UserCheck, AlertCircle } from 'lucide-react';
+import { Sparkles, ArrowRight, Mail, Lock, UserCheck, AlertCircle } from 'lucide-react';
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   const login = useProjectStore((state) => state.login);
   const router = useRouter();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   if (!mounted) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     if (!email || !password) {
       setError('Please fill in all fields.');
       return;
     }
 
     setLoading(true);
-    // Simulate minor network delay for premium feel
-    setTimeout(() => {
-      const success = login(email, password);
-      setLoading(false);
-      if (success) {
-        router.replace('/dashboard');
-      } else {
-        setError('Invalid email or password. Please try again.');
+
+    try {
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Invalid email or password.');
       }
-    }, 800);
+
+      const auth = await response.json();
+
+      if (!auth.token) {
+        throw new Error('Authentication token was not returned.');
+      }
+
+      localStorage.setItem('reqsync_token', auth.token);
+
+      const success = login(email, password);
+
+      if (!success) {
+        localStorage.removeItem('reqsync_token');
+        throw new Error('Unable to load frontend user profile.');
+      }
+
+      router.replace('/dashboard');
+    } catch (error) {
+      localStorage.removeItem('reqsync_token');
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Login failed. Please try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleQuickFill = (testEmail: string) => {
@@ -127,7 +165,7 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Enter password"
                   className="w-full text-xs bg-slate-950 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
                   required
                 />
@@ -176,7 +214,7 @@ export default function LoginPage() {
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => handleQuickFill('ceo@company.com')}
+              onClick={() => handleQuickFill('ceo@reqsync.com')}
               className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
             >
               <span className="font-bold text-white">Chief Executive</span>
@@ -184,7 +222,7 @@ export default function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={() => handleQuickFill('michael.b@company.com')}
+              onClick={() => handleQuickFill('michael@reqsync.com')}
               className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
             >
               <span className="font-bold text-white">Michael Brown</span>
@@ -192,7 +230,7 @@ export default function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={() => handleQuickFill('sarah.j@company.com')}
+              onClick={() => handleQuickFill('sarah@reqsync.com')}
               className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
             >
               <span className="font-bold text-white">Sarah Johnson</span>
@@ -200,7 +238,7 @@ export default function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={() => handleQuickFill('john.d@company.com')}
+              onClick={() => handleQuickFill('john@reqsync.com')}
               className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
             >
               <span className="font-bold text-white">John Doe</span>
@@ -208,7 +246,7 @@ export default function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={() => handleQuickFill('emily.d@company.com')}
+              onClick={() => handleQuickFill('emily@reqsync.com')}
               className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
             >
               <span className="font-bold text-white">Emily Davis</span>
@@ -216,7 +254,7 @@ export default function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={() => handleQuickFill('client@external.com')}
+              onClick={() => handleQuickFill('alice@reqsync.com')}
               className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition-colors text-[10px] flex flex-col cursor-pointer"
             >
               <span className="font-bold text-white">Alice Smith</span>
