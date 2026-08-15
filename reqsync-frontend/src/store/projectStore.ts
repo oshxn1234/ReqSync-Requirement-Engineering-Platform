@@ -113,7 +113,7 @@ export interface AppUser {
   name: string;
   email: string;
   password?: string;
-  role: 'CEO' | 'Project Manager' | 'Business Analyst' | 'Developer' | 'QA Engineer' | 'Stakeholder';
+  role: 'CEO' | 'System Admin' | 'Project Manager' | 'Business Analyst' | 'Developer' | 'QA Engineer' | 'Stakeholder';
   skills?: string;
 }
 
@@ -164,6 +164,7 @@ interface ProjectState {
   addKnowledge: (item: Omit<KnowledgeItem, 'id' | 'date'>) => void;
   updateSettings: (settings: Partial<ProjectSettings>) => void;
   login: (email: string, password: string) => boolean;
+  setAuthenticatedUser: (user: AppUser | null) => void;
   logout: () => void;
   registerBusiness: (ceoName: string, email: string, password: string, companyName: string, regNumber: string, address: string) => void;
   createUserAccount: (name: string, email: string, password: string, role: AppUser['role'], skills?: string) => boolean;
@@ -968,7 +969,14 @@ export const useProjectStore = create<ProjectState>()(
         return success;
       },
 
-      logout: () => set({ currentUser: null }),
+      setAuthenticatedUser: (user) => set({ currentUser: user }),
+
+      logout: () => {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('reqsync_token');
+        }
+        set({ currentUser: null });
+      },
 
       registerBusiness: (ceoName, email, password, companyName, regNumber, address) =>
         set((state) => {

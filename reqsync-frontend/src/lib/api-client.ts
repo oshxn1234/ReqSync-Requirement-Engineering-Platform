@@ -45,6 +45,25 @@ export async function apiRequest<T>(
   }
 
 
+  /*
+   * Automatically attach JWT for protected requests.
+   */
+  if (
+    typeof window !== 'undefined' &&
+    !headers.has('Authorization')
+  ) {
+    const token =
+      localStorage.getItem('reqsync_token');
+
+    if (token) {
+      headers.set(
+        'Authorization',
+        `Bearer ${token}`
+      );
+    }
+  }
+
+
   let response: Response;
 
 
