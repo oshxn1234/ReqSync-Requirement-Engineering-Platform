@@ -7,7 +7,7 @@ import com.reqsync.reqsync_backend.requirement.service.RequirementCompletenessSe
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-//@RestController
+@RestController
 @RequestMapping("/api")
 public class RequirementCompletenessController {
 
@@ -16,7 +16,6 @@ public class RequirementCompletenessController {
 
     private final ProjectCompletenessService
             projectCompletenessService;
-
 
     public RequirementCompletenessController(
             RequirementCompletenessService requirementCompletenessService,
@@ -30,68 +29,31 @@ public class RequirementCompletenessController {
                 projectCompletenessService;
     }
 
-
-    /**
-     * Analyze ONE selected requirement.
-     *
-     * Example:
-     *
-     * POST
-     * /api/requirements/5/completeness
-     */
     @PostMapping(
             "/requirements/{requirementId}/completeness"
     )
-    public ResponseEntity<
-            RequirementCompletenessResponse
-            >
+    public ResponseEntity<RequirementCompletenessResponse>
     analyzeRequirement(
-            @PathVariable
-            Long requirementId
+            @PathVariable Long requirementId
     ) {
 
-        RequirementCompletenessResponse response =
-                requirementCompletenessService
-                        .analyze(
-                                requirementId
-                        );
-
-
         return ResponseEntity.ok(
-                response
+                requirementCompletenessService
+                        .analyze(requirementId)
         );
     }
 
-
-    /**
-     * Analyze ALL requirements
-     * belonging to one project.
-     *
-     * Example:
-     *
-     * POST
-     * /api/projects/1/requirements/completeness
-     */
     @PostMapping(
             "/projects/{projectId}/requirements/completeness"
     )
-    public ResponseEntity<
-            ProjectCompletenessResponse
-            >
+    public ResponseEntity<ProjectCompletenessResponse>
     analyzeProject(
-            @PathVariable
-            Long projectId
+            @PathVariable Long projectId
     ) {
 
-        ProjectCompletenessResponse response =
-                projectCompletenessService
-                        .analyzeProject(
-                                projectId
-                        );
-
-
         return ResponseEntity.ok(
-                response
+                projectCompletenessService
+                        .analyzeProject(projectId)
         );
     }
 }
