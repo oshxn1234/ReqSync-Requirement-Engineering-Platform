@@ -2,24 +2,38 @@
 
 import { useEffect, useState } from 'react';
 import { useProjectStore, Requirement, UserStory, Task } from '@/store/projectStore';
-import { Sparkles, BrainCircuit, Activity, FileText, CheckCircle2, ChevronRight, Download, Users, Zap, AlertTriangle, FileCheck, ArrowRight, Printer, RotateCw, Plus } from 'lucide-react';
+import { useBackendProjectStore } from '@/store/backendProjectStore';
+import {
+  analyzeRequirementCompleteness,
+  getProjectRequirements,
+  type RequirementCompletenessResponse,
+  type RequirementSummaryResponse,
+} from '@/lib/completeness-api';
+import { Sparkles, BrainCircuit, Activity, FileText, CheckCircle2, Users, Zap, AlertTriangle, Printer, RotateCw, Plus } from 'lucide-react';
 
 export default function AiAnalysisPage() {
   const [mounted, setMounted] = useState(false);
 
   const requirements = useProjectStore((state) => state.requirements);
   const addRequirement = useProjectStore((state) => state.addRequirement);
-  const updateRequirement = useProjectStore((state) => state.updateRequirement);
-  const userStories = useProjectStore((state) => state.userStories);
   const addUserStory = useProjectStore((state) => state.addUserStory);
-  const tasks = useProjectStore((state) => state.tasks);
   const addTask = useProjectStore((state) => state.addTask);
   const settings = useProjectStore((state) => state.settings);
   const currentUser = useProjectStore((state) => state.currentUser);
+  const selectedBackendProjectId = useBackendProjectStore((state) => state.selectedProjectId);
 
   // States
   const [activeTab, setActiveTab] = useState<'notes' | 'quality' | 'suitability' | 'srs'>('notes');
-  const [selectedReqId, setSelectedReqId] = useState<string>('REQ-128');
+
+  // Real backend completeness state
+  const [backendRequirements, setBackendRequirements] = useState<RequirementSummaryResponse[]>([]);
+  const [selectedBackendRequirementId, setSelectedBackendRequirementId] = useState<number | null>(null);
+  const [requirementsLoading, setRequirementsLoading] = useState(false);
+  const [requirementsError, setRequirementsError] = useState<string | null>(null);
+
+  const [completenessResult, setCompletenessResult] = useState<RequirementCompletenessResponse | null>(null);
+  const [completenessLoading, setCompletenessLoading] = useState(false);
+  const [completenessError, setCompletenessError] = useState<string | null>(null);
 
   // Extraction State
   const [meetingNotes, setMeetingNotes] = useState(
@@ -43,6 +57,92 @@ export default function AiAnalysisPage() {
     setMounted(true);
   }, []);
 
+  // Load real requirements for the selected backend project
+  useEffect(() => {
+    if (!mounted) return;
+
+    const loadRequirements = async () => {
+      try {
+        setRequirementsLoading(true);
+        setRequirementsError(null);
+
+        const projectId = selectedBackendProjectId ?? 1;
+        const response = await getProjectRequirements(projectId);
+
+        setBackendRequirements(response);
+        setCompletenessResult(null);
+        setCompletenessError(null);
+
+        if (response.length > 0) {
+          setSelectedBackendRequirementId((currentId) => {
+            if (currentId && response.some((req) => req.id === currentId)) {
+              return currentId;
+            }
+            return response[0].id;
+          });
+        } else {
+          setSelectedBackendRequirementId(null);
+        }
+      } catch (error) {
+        setBackendRequirements([]);
+        setSelectedBackendRequirementId(null);
+        setCompletenessResult(null);
+        setRequirementsError(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load requirements from the backend.'
+        );
+      } finally {
+        setRequirementsLoading(false);
+      }
+    };
+
+    void loadRequirements();
+  }, [mounted, selectedBackendProjectId]);
+
+  // Run the real completeness analysis for the selected requirement
+  useEffect(() => {
+    if (!mounted || activeTab !== 'quality' || selectedBackendRequirementId === null) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const runAnalysis = async () => {
+      try {
+        setCompletenessLoading(true);
+        setCompletenessError(null);
+
+        const response = await analyzeRequirementCompleteness(
+          selectedBackendRequirementId
+        );
+
+        if (!cancelled) {
+          setCompletenessResult(response);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setCompletenessResult(null);
+          setCompletenessError(
+            error instanceof Error
+              ? error.message
+              : 'Requirement completeness analysis failed.'
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setCompletenessLoading(false);
+        }
+      }
+    };
+
+    void runAnalysis();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted, activeTab, selectedBackendRequirementId]);
+
   if (!mounted) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -51,8 +151,54 @@ export default function AiAnalysisPage() {
     );
   }
 
-  // Selected requirement metrics
-  const selectedReq = requirements.find((r) => r.id === selectedReqId) || requirements[0];
+  const selectedBackendRequirement =
+    backendRequirements.find((req) => req.id === selectedBackendRequirementId) ??
+    backendRequirements[0] ??
+    null;
+
+  const formatEnum = (value: string | null | undefined) => {
+    if (!value) return '-';
+
+    return value
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (character) => character.toUpperCase());
+  };
+
+  const criterionScore = (criterionName: string) => {
+    const criterion = completenessResult?.criteria?.find(
+      (item) => item.criterion === criterionName
+    );
+
+    if (!criterion) return 0;
+    if (criterion.status === 'PASS') return 100;
+    if (criterion.status === 'PARTIAL') return 50;
+    return 0;
+  };
+
+  const rerunCompletenessAnalysis = async () => {
+    if (selectedBackendRequirementId === null) return;
+
+    try {
+      setCompletenessLoading(true);
+      setCompletenessError(null);
+
+      const response = await analyzeRequirementCompleteness(
+        selectedBackendRequirementId
+      );
+
+      setCompletenessResult(response);
+    } catch (error) {
+      setCompletenessResult(null);
+      setCompletenessError(
+        error instanceof Error
+          ? error.message
+          : 'Requirement completeness analysis failed.'
+      );
+    } finally {
+      setCompletenessLoading(false);
+    }
+  };
 
   // 1. Run AI extraction simulation
   const handleExtractRequirements = () => {
@@ -161,25 +307,6 @@ export default function AiAnalysisPage() {
     }
 
     return { score, reason };
-  };
-
-  // Auto fix completeness trigger
-  const handleAutoFixClarity = (reqId: string) => {
-    const r = requirements.find(req => req.id === reqId);
-    if (!r) return;
-
-    // Update quality scores
-    updateRequirement(reqId, {
-      completeness: 98,
-      completenessBreakdown: {
-        clarity: 98,
-        verifiability: 95,
-        quality: 98,
-        conciseness: 98,
-        consistency: 98
-      },
-      aiSuggestions: ["Requirements clarity optimized by AI auto-phrase. Clear constraints applied."]
-    });
   };
 
   // Printable SRS View
@@ -358,138 +485,400 @@ export default function AiAnalysisPage() {
         {/* Tab 2: Completeness & Impact */}
         {activeTab === 'quality' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-            {/* Left spec select list */}
+            {/* Left requirement select list - REAL BACKEND DATA */}
             <div className="lg:col-span-1 border border-slate-200 p-4.5 rounded-xl space-y-3 shrink-0">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Select Requirement</h3>
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Select Requirement
+              </h3>
+
               <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-                {requirements.map((req) => (
+                {requirementsLoading && (
+                  <div className="p-4 text-xs text-slate-500 text-center">
+                    <RotateCw className="w-4 h-4 animate-spin mx-auto mb-2 text-blue-600" />
+                    Loading requirements...
+                  </div>
+                )}
+
+                {requirementsError && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
+                    <div className="font-bold mb-1">Unable to load requirements</div>
+                    {requirementsError}
+                  </div>
+                )}
+
+                {!requirementsLoading &&
+                  !requirementsError &&
+                  backendRequirements.length === 0 && (
+                    <div className="p-4 text-xs text-slate-500 text-center">
+                      No requirements found for this project.
+                    </div>
+                  )}
+
+                {backendRequirements.map((req) => (
                   <button
                     key={req.id}
-                    onClick={() => setSelectedReqId(req.id)}
+                    onClick={() => {
+                      setSelectedBackendRequirementId(req.id);
+                      setCompletenessResult(null);
+                      setCompletenessError(null);
+                    }}
                     className={`w-full text-left p-3 rounded-xl border text-xs transition-all ${
-                      selectedReqId === req.id
+                      selectedBackendRequirementId === req.id
                         ? 'border-blue-600 bg-blue-50/40 text-blue-900 font-semibold shadow-2xs'
                         : 'border-slate-100 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-200 text-slate-700'
                     }`}
                   >
-                    <div className="font-bold text-[10px] text-slate-400 mb-0.5">{req.id}</div>
+                    <div className="font-bold text-[10px] text-slate-400 mb-0.5">
+                      {req.code}
+                    </div>
                     <div className="truncate font-semibold">{req.title}</div>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Right audit metrics view */}
+            {/* Right completeness analysis view - REAL BACKEND RESULT */}
             <div className="lg:col-span-2 space-y-6">
               <div className="space-y-1 pb-4 border-b border-slate-100">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{selectedReq.id} Audit Analysis</span>
-                <h3 className="text-base font-bold text-slate-900 leading-normal">{selectedReq.title}</h3>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {selectedBackendRequirement?.code ?? 'No Requirement'} Audit Analysis
+                </span>
+
+                <h3 className="text-base font-bold text-slate-900 leading-normal">
+                  {selectedBackendRequirement?.title ?? 'Select a requirement'}
+                </h3>
+
+                {selectedBackendRequirement && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full font-bold">
+                      {formatEnum(selectedBackendRequirement.type)}
+                    </span>
+
+                    <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full font-bold">
+                      {formatEnum(selectedBackendRequirement.priority)}
+                    </span>
+
+                    <span className="text-[9px] bg-slate-50 text-slate-600 border border-slate-100 px-2 py-0.5 rounded-full font-bold">
+                      {formatEnum(selectedBackendRequirement.status)}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* Quality details breakdown */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Visual completion ring & scores */}
-                <div className="border border-slate-200 rounded-2xl p-5 space-y-4">
-                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <Zap className="w-4 h-4 text-amber-500" />
-                    Completeness Vectors
+              {completenessLoading && (
+                <div className="min-h-[360px] border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center p-8">
+                  <RotateCw className="w-7 h-7 animate-spin text-blue-600" />
+                  <h4 className="text-sm font-bold text-slate-800 mt-3">
+                    Running completeness analysis...
                   </h4>
+                  <p className="text-xs text-slate-500 mt-1">
+                    ReqSync is analyzing the selected requirement with the backend AI service.
+                  </p>
+                </div>
+              )}
 
-                  <div className="flex items-center justify-around gap-4">
-                    {/* Ring */}
-                    <div className="relative w-20 h-20 shrink-0">
-                      <svg className="w-full h-full transform -rotate-90">
-                        <circle cx="40" cy="40" r="32" stroke="#f1f5f9" strokeWidth="6.5" fill="transparent" />
-                        <circle 
-                          cx="40" 
-                          cy="40" 
-                          r="32" 
-                          stroke={selectedReq.completeness > 85 ? '#10b981' : '#f59e0b'} 
-                          strokeWidth="6.5" 
-                          fill="transparent" 
-                          strokeDasharray={`${2 * Math.PI * 32}`}
-                          strokeDashoffset={`${2 * Math.PI * 32 * (1 - selectedReq.completeness / 100)}`}
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center font-black text-slate-800 text-sm">
-                        {selectedReq.completeness}%
+              {!completenessLoading && completenessError && (
+                <div className="border border-rose-200 bg-rose-50 rounded-2xl p-5">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm font-bold text-rose-800">
+                        Completeness analysis failed
+                      </h4>
+                      <p className="text-xs text-rose-700 mt-1 break-words">
+                        {completenessError}
+                      </p>
+                      <button
+                        onClick={() => void rerunCompletenessAnalysis()}
+                        className="mt-3 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold"
+                      >
+                        Retry Analysis
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!completenessLoading &&
+                !completenessError &&
+                completenessResult && (
+                  <>
+                    {/* Completeness score + AI suggestions */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="border border-slate-200 rounded-2xl p-5 space-y-4">
+                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <Zap className="w-4 h-4 text-amber-500" />
+                          Completeness Vectors
+                        </h4>
+
+                        <div className="flex items-center justify-around gap-4">
+                          <div className="relative w-20 h-20 shrink-0">
+                            <svg className="w-full h-full transform -rotate-90">
+                              <circle
+                                cx="40"
+                                cy="40"
+                                r="32"
+                                stroke="#f1f5f9"
+                                strokeWidth="6.5"
+                                fill="transparent"
+                              />
+                              <circle
+                                cx="40"
+                                cy="40"
+                                r="32"
+                                stroke={
+                                  completenessResult.completenessScore >= 85
+                                    ? '#10b981'
+                                    : completenessResult.completenessScore >= 60
+                                      ? '#f59e0b'
+                                      : '#ef4444'
+                                }
+                                strokeWidth="6.5"
+                                fill="transparent"
+                                strokeDasharray={`${2 * Math.PI * 32}`}
+                                strokeDashoffset={`${
+                                  2 *
+                                  Math.PI *
+                                  32 *
+                                  (1 - completenessResult.completenessScore / 100)
+                                }`}
+                                strokeLinecap="round"
+                              />
+                            </svg>
+
+                            <div className="absolute inset-0 flex items-center justify-center font-black text-slate-800 text-sm">
+                              {completenessResult.completenessScore}%
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5 text-[11px] font-medium text-slate-600 flex-1">
+                            <div className="flex justify-between">
+                              <span>Actor</span>
+                              <span className="font-bold text-slate-800">
+                                {criterionScore('ACTOR')}%
+                              </span>
+                            </div>
+
+                            <div className="flex justify-between">
+                              <span>Testability</span>
+                              <span className="font-bold text-slate-800">
+                                {criterionScore('TESTABILITY')}%
+                              </span>
+                            </div>
+
+                            <div className="flex justify-between">
+                              <span>Consistency</span>
+                              <span className="font-bold text-slate-800">
+                                {criterionScore('CONSISTENCY')}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3">
+                          <span
+                            className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${
+                              completenessResult.status === 'COMPLETE'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : completenessResult.status === 'NEEDS_IMPROVEMENT'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}
+                          >
+                            {formatEnum(completenessResult.status)}
+                          </span>
+
+                          <button
+                            onClick={() => void rerunCompletenessAnalysis()}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold"
+                          >
+                            Re-run Analysis
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="border border-slate-200 rounded-2xl p-5 space-y-3.5">
+                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-indigo-600" />
+                          AI Action Recommendations
+                        </h4>
+
+                        <ul className="space-y-2 text-xs leading-normal">
+                          {(completenessResult.suggestions ?? []).length === 0 && (
+                            <li className="flex gap-2 items-start bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl font-medium text-emerald-700">
+                              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                              <span>No additional improvement suggestions were returned.</span>
+                            </li>
+                          )}
+
+                          {(completenessResult.suggestions ?? []).map((suggestion, index) => (
+                            <li
+                              key={index}
+                              className="flex gap-2 items-start bg-slate-50 border border-slate-100 p-2.5 rounded-xl font-medium text-slate-600"
+                            >
+                              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                              <span>{suggestion}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     </div>
 
-                    <div className="space-y-1.5 text-[11px] font-medium text-slate-600 flex-1">
-                      <div className="flex justify-between">
-                        <span>Clarity</span>
-                        <span className="font-bold text-slate-800">{selectedReq.completenessBreakdown.clarity}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Verifiability</span>
-                        <span className="font-bold text-slate-800">{selectedReq.completenessBreakdown.verifiability}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Consistency</span>
-                        <span className="font-bold text-slate-800">{selectedReq.completenessBreakdown.consistency}%</span>
+                    {/* Real semantic coverage checks from backend */}
+                    <div className="border border-slate-200 rounded-2xl p-5 space-y-4">
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <Activity className="w-4 h-4 text-rose-500" />
+                        Semantic Coverage & Gap Validation
+                      </h4>
+
+                      {(completenessResult.coverageChecks ?? []).length === 0 ? (
+                        <div className="text-xs text-slate-500 font-medium leading-relaxed bg-slate-50 border border-slate-100 p-3 rounded-xl">
+                          No potential requirement gaps required semantic coverage validation.
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {(completenessResult.coverageChecks ?? []).map((check, index) => (
+                            <div
+                              key={`${check.topic}-${index}`}
+                              className="bg-slate-50 border border-slate-100 p-3 rounded-xl"
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-slate-800">
+                                  {check.topic}
+                                </span>
+                                <span
+                                  className={`w-fit text-[9px] font-black px-2 py-0.5 rounded-full border ${
+                                    check.status === 'COVERED'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : check.status === 'PARTIALLY_COVERED'
+                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                        : 'bg-rose-50 text-rose-700 border-rose-200'
+                                  }`}
+                                >
+                                  {formatEnum(check.status)}
+                                </span>
+                              </div>
+
+                              <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                                {check.reason}
+                              </p>
+
+                              {check.relatedRequirementCode && (
+                                <p className="text-[10px] text-blue-600 font-bold mt-1.5">
+                                  Related: {check.relatedRequirementCode}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                        <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                          <span className="text-[10px] text-slate-400 block font-bold">
+                            Covered
+                          </span>
+                          <span className="text-lg font-black text-emerald-700">
+                            {
+                              (completenessResult.coverageChecks ?? []).filter(
+                                (check) => check.status === 'COVERED'
+                              ).length
+                            }
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                          <span className="text-[10px] text-slate-400 block font-bold">
+                            Partial
+                          </span>
+                          <span className="text-lg font-black text-amber-700">
+                            {
+                              (completenessResult.coverageChecks ?? []).filter(
+                                (check) => check.status === 'PARTIALLY_COVERED'
+                              ).length
+                            }
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                          <span className="text-[10px] text-slate-400 block font-bold">
+                            Missing
+                          </span>
+                          <span className="text-lg font-black text-rose-700">
+                            {
+                              (completenessResult.coverageChecks ?? []).filter(
+                                (check) => check.status === 'MISSING'
+                              ).length
+                            }
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                          <span className="text-[10px] text-slate-400 block font-bold">
+                            Confirmed Gaps
+                          </span>
+                          <span className="text-lg font-black text-slate-800">
+                            {(completenessResult.confirmedMissing ?? []).length}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {selectedReq.completeness < 95 && currentUser?.role !== 'CEO' && (
-                    <button
-                      onClick={() => handleAutoFixClarity(selectedReq.id)}
-                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-                    >
-                      Auto-Resolve Clarity Ambiguity
-                    </button>
-                  )}
-                </div>
+                    {/* Detailed real backend criteria */}
+                    <div className="border border-slate-200 rounded-2xl p-5 space-y-4">
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                        Detailed Completeness Criteria
+                      </h4>
 
-                {/* AI suggestion checks */}
-                <div className="border border-slate-200 rounded-2xl p-5 space-y-3.5">
-                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-indigo-600" />
-                    AI Action Recommendations
-                  </h4>
-                  <ul className="space-y-2 text-xs leading-normal">
-                    {selectedReq.aiSuggestions.map((sug, idx) => (
-                      <li key={idx} className="flex gap-2 items-start bg-slate-50 border border-slate-100 p-2.5 rounded-xl font-medium text-slate-600">
-                        <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                        <span>{sug}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {(completenessResult.criteria ?? []).map((criterion, index) => (
+                          <div
+                            key={`${criterion.criterion}-${index}`}
+                            className="bg-slate-50 border border-slate-100 p-3 rounded-xl"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] font-extrabold text-slate-800">
+                                {formatEnum(criterion.criterion)}
+                              </span>
 
-              {/* Impact Propagation */}
-              <div className="border border-slate-200 rounded-2xl p-5 space-y-4">
-                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-rose-500" />
-                  Downstream Impact Propagation Graph
-                </h4>
+                              <span
+                                className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
+                                  criterion.status === 'PASS'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : criterion.status === 'PARTIAL'
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                      : 'bg-rose-50 text-rose-700 border-rose-200'
+                                }`}
+                              >
+                                {formatEnum(criterion.status)}
+                              </span>
+                            </div>
 
-                <p className="text-xs text-slate-500 font-medium leading-relaxed bg-slate-50 border border-slate-100 p-3 rounded-xl">
-                  {selectedReq.impactExplanation}
-                </p>
+                            <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
+                              {criterion.explanation}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                  <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                    <span className="text-[10px] text-slate-400 block font-bold">Affected Specs</span>
-                    <span className="text-lg font-black text-slate-800">{selectedReq.affectedReqs}</span>
+              {!completenessLoading &&
+                !completenessError &&
+                !completenessResult &&
+                selectedBackendRequirement && (
+                  <div className="min-h-[300px] border border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center text-center p-8">
+                    <Activity className="w-8 h-8 text-blue-400" />
+                    <h4 className="text-sm font-bold text-slate-800 mt-3">
+                      Ready for completeness analysis
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Select a requirement to run the backend AI completeness analysis.
+                    </p>
                   </div>
-                  <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                    <span className="text-[10px] text-slate-400 block font-bold">User Stories</span>
-                    <span className="text-lg font-black text-slate-800">{selectedReq.affectedStories}</span>
-                  </div>
-                  <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                    <span className="text-[10px] text-slate-400 block font-bold">Dev Tasks</span>
-                    <span className="text-lg font-black text-slate-800">{selectedReq.affectedTasks}</span>
-                  </div>
-                  <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                    <span className="text-[10px] text-slate-400 block font-bold">Test Cases</span>
-                    <span className="text-lg font-black text-slate-800">{selectedReq.affectedTestCases}</span>
-                  </div>
-                </div>
-              </div>
+                )}
             </div>
           </div>
         )}
