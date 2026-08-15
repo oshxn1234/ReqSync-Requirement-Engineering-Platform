@@ -12,11 +12,5 @@ public enum Role {
 
     DEVELOPER,
 
-<<<<<<< Updated upstream
-    QA_ENGINEER,
-
-    STAKEHOLDER
-=======
     QA_ENGINEER
->>>>>>> Stashed changes
 }
