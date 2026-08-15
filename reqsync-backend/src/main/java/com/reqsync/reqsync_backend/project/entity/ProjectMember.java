@@ -1,7 +1,6 @@
 package com.reqsync.reqsync_backend.project.entity;
 
 import com.reqsync.reqsync_backend.auth.entity.User;
-
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;

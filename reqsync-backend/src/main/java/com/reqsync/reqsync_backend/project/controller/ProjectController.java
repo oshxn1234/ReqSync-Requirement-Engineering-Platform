@@ -5,7 +5,12 @@ import com.reqsync.reqsync_backend.project.dto.ProjectResponse;
 import com.reqsync.reqsync_backend.project.dto.ProjectUpdateRequest;
 import com.reqsync.reqsync_backend.project.enums.ProjectStatus;
 import com.reqsync.reqsync_backend.project.service.ProjectService;
+
 import org.springframework.http.ResponseEntity;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,22 +32,34 @@ public class ProjectController {
     }
 
 
+    // =========================================================
+    // CREATE PROJECT
+    // =========================================================
+
     /**
      * Create project.
+     *
+     * Only CEO can create projects.
      *
      * POST /api/projects
      */
     @PostMapping
+    @PreAuthorize(
+            "hasRole('CEO')"
+    )
     public ResponseEntity<ProjectResponse>
     createProject(
             @RequestBody
-            ProjectCreateRequest request
+            ProjectCreateRequest request,
+
+            Authentication authentication
     ) {
 
         ProjectResponse response =
                 projectService
                         .createProject(
-                                request
+                                request,
+                                authentication
                         );
 
 
@@ -52,111 +69,215 @@ public class ProjectController {
     }
 
 
+    // =========================================================
+    // GET ALL PROJECTS
+    // =========================================================
+
     /**
-     * Get all projects.
+     * Get all projects belonging to
+     * the authenticated user's business.
      *
      * GET /api/projects
      */
     @GetMapping
-    public ResponseEntity<List<ProjectResponse>>
-    getAllProjects() {
-
-        return ResponseEntity.ok(
-                projectService
-                        .getAllProjects()
-        );
-    }
-
-
-    /**
-     * Get one project.
-     *
-     * GET /api/projects/1
-     */
-    @GetMapping("/{projectId}")
-    public ResponseEntity<ProjectResponse>
-    getProjectById(
-            @PathVariable
-            Long projectId
+    public ResponseEntity<
+            List<ProjectResponse>
+            >
+    getAllProjects(
+            Authentication authentication
     ) {
 
         return ResponseEntity.ok(
                 projectService
-                        .getProjectById(
-                                projectId
+                        .getAllProjects(
+                                authentication
                         )
         );
     }
 
 
+    // =========================================================
+    // GET ONE PROJECT
+    // =========================================================
+
     /**
-     * Filter projects by status.
+     * Get one project.
+     *
+     * The project must belong to
+     * the authenticated user's business.
+     *
+     * GET /api/projects/1
+     */
+    @GetMapping(
+            "/{projectId}"
+    )
+    public ResponseEntity<ProjectResponse>
+    getProjectById(
+            @PathVariable
+            Long projectId,
+
+            Authentication authentication
+    ) {
+
+        return ResponseEntity.ok(
+                projectService
+                        .getProjectById(
+                                projectId,
+                                authentication
+                        )
+        );
+    }
+
+
+    // =========================================================
+    // FILTER BY STATUS
+    // =========================================================
+
+    /**
+     * Get projects belonging to
+     * authenticated user's business
+     * filtered by status.
      *
      * GET /api/projects/status/ACTIVE
      */
     @GetMapping(
             "/status/{status}"
     )
-    public ResponseEntity<List<ProjectResponse>>
+    public ResponseEntity<
+            List<ProjectResponse>
+            >
     getByStatus(
             @PathVariable
-            ProjectStatus status
+            ProjectStatus status,
+
+            Authentication authentication
     ) {
 
         return ResponseEntity.ok(
                 projectService
                         .getProjectsByStatus(
-                                status
+                                status,
+                                authentication
                         )
         );
     }
 
 
+    // =========================================================
+    // UPDATE PROJECT
+    // =========================================================
+
     /**
      * Update project.
      *
+     * Only CEO can update
+     * project information.
+     *
      * PUT /api/projects/1
      */
-    @PutMapping("/{projectId}")
+    @PutMapping(
+            "/{projectId}"
+    )
+    @PreAuthorize(
+            "hasRole('CEO')"
+    )
     public ResponseEntity<ProjectResponse>
     updateProject(
             @PathVariable
             Long projectId,
 
             @RequestBody
-            ProjectUpdateRequest request
+            ProjectUpdateRequest request,
+
+            Authentication authentication
     ) {
 
         return ResponseEntity.ok(
                 projectService
                         .updateProject(
                                 projectId,
-                                request
+                                request,
+                                authentication
                         )
         );
     }
 
 
+    // =========================================================
+    // DELETE PROJECT
+    // =========================================================
+
     /**
      * Delete project.
      *
+     * Only CEO can delete.
+     *
      * DELETE /api/projects/1
      */
-    @DeleteMapping("/{projectId}")
+    @DeleteMapping(
+            "/{projectId}"
+    )
+    @PreAuthorize(
+            "hasRole('CEO')"
+    )
     public ResponseEntity<Void>
     deleteProject(
             @PathVariable
-            Long projectId
+            Long projectId,
+
+            Authentication authentication
     ) {
 
         projectService
                 .deleteProject(
-                        projectId
+                        projectId,
+                        authentication
                 );
 
 
         return ResponseEntity
                 .noContent()
                 .build();
+    }
+
+    // =========================================================
+// ASSIGN PROJECT MANAGER
+// =========================================================
+
+    /**
+     * CEO assigns Project Manager.
+     *
+     * PUT
+     * /api/projects/{projectId}/project-manager/{managerId}
+     *
+     * Example:
+     *
+     * /api/projects/5/project-manager/8
+     */
+    @PutMapping(
+            "/{projectId}/project-manager/{managerId}"
+    )
+    @PreAuthorize(
+            "hasRole('CEO')"
+    )
+    public ResponseEntity<ProjectResponse>
+    assignProjectManager(
+            @PathVariable
+            Long projectId,
+
+            @PathVariable
+            Long managerId,
+
+            Authentication authentication
+    ) {
+
+        return ResponseEntity.ok(
+                projectService
+                        .assignProjectManager(
+                                projectId,
+                                managerId,
+                                authentication
+                        )
+        );
     }
 }

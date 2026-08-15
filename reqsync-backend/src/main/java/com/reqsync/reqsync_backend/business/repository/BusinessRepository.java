@@ -1,7 +1,6 @@
 package com.reqsync.reqsync_backend.business.repository;
 
 import com.reqsync.reqsync_backend.business.entity.Business;
-
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

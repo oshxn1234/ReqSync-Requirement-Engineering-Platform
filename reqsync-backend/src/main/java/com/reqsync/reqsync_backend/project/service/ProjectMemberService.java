@@ -9,8 +9,6 @@ import com.reqsync.reqsync_backend.project.dto.ProjectMemberResponse;
 import com.reqsync.reqsync_backend.project.entity.Project;
 import com.reqsync.reqsync_backend.project.entity.ProjectMember;
 
-import com.reqsync.reqsync_backend.project.enums.ProjectStatus;
-
 import com.reqsync.reqsync_backend.project.repository.ProjectMemberRepository;
 import com.reqsync.reqsync_backend.project.repository.ProjectRepository;
 
@@ -85,14 +83,6 @@ public class ProjectMemberService {
                         projectId,
                         projectManager
                 );
-
-
-        /*
-         * Completed projects must be immutable.
-         */
-        validateProjectIsEditable(
-                project
-        );
 
 
         Long businessId =
@@ -299,18 +289,9 @@ public class ProjectMemberService {
         }
 
 
-        Project project =
-                getManagedProject(
-                        projectId,
-                        projectManager
-                );
-
-
-        /*
-         * Completed projects must be immutable.
-         */
-        validateProjectIsEditable(
-                project
+        getManagedProject(
+                projectId,
+                projectManager
         );
 
 
@@ -409,26 +390,6 @@ public class ProjectMemberService {
 
 
     // ==========================================
-    // VERIFY PROJECT IS EDITABLE
-    // ==========================================
-
-    private void validateProjectIsEditable(
-            Project project
-    ) {
-
-        if (
-                project.getStatus()
-                        == ProjectStatus.COMPLETED
-        ) {
-
-            throw new RuntimeException(
-                    "Project members cannot be modified after the project is completed."
-            );
-        }
-    }
-
-
-    // ==========================================
     // VALID PROJECT MEMBER ROLES
     // ==========================================
 
@@ -465,8 +426,6 @@ public class ProjectMemberService {
                 authentication == null
                         ||
                         authentication.getName() == null
-                        ||
-                        authentication.getName().isBlank()
         ) {
 
             throw new RuntimeException(

@@ -12,16 +12,6 @@ import java.time.LocalDateTime;
                         name = "uk_business_registration_number",
                         columnNames = "registration_number"
                 )
-        },
-        indexes = {
-                @Index(
-                        name = "idx_business_name",
-                        columnList = "name"
-                ),
-                @Index(
-                        name = "idx_business_registration_number",
-                        columnList = "registration_number"
-                )
         }
 )
 public class Business {
@@ -35,7 +25,7 @@ public class Business {
 
     @Column(
             nullable = false,
-            length = 255
+            length = 200
     )
     private String name;
 
@@ -80,30 +70,6 @@ public class Business {
 
 
     // ==========================================
-    // JPA Lifecycle
-    // ==========================================
-
-    @PrePersist
-    protected void onCreate() {
-
-        LocalDateTime now =
-                LocalDateTime.now();
-
-        createdAt = now;
-
-        updatedAt = now;
-    }
-
-
-    @PreUpdate
-    protected void onUpdate() {
-
-        updatedAt =
-                LocalDateTime.now();
-    }
-
-
-    // ==========================================
     // Constructors
     // ==========================================
 
@@ -119,20 +85,36 @@ public class Business {
             String address
     ) {
 
-        this.name =
-                name;
-
+        this.name = name;
         this.registrationNumber =
                 registrationNumber;
 
-        this.email =
-                email;
+        this.email = email;
+        this.phone = phone;
+        this.address = address;
+    }
 
-        this.phone =
-                phone;
 
-        this.address =
-                address;
+    // ==========================================
+    // JPA Lifecycle
+    // ==========================================
+
+    @PrePersist
+    protected void onCreate() {
+
+        LocalDateTime now =
+                LocalDateTime.now();
+
+        createdAt = now;
+        updatedAt = now;
+    }
+
+
+    @PreUpdate
+    protected void onUpdate() {
+
+        updatedAt =
+                LocalDateTime.now();
     }
 
 

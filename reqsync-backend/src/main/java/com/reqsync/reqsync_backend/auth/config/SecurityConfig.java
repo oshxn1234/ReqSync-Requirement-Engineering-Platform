@@ -1,15 +1,16 @@
 package com.reqsync.reqsync_backend.auth.config;
 
-import com.reqsync.reqsync_backend.auth.service.CustomUserDetailsService;
 import com.reqsync.reqsync_backend.auth.security.JwtAuthenticationFilter;
+import com.reqsync.reqsync_backend.auth.service.CustomUserDetailsService;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 
@@ -26,11 +27,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
-    private final CustomUserDetailsService userDetailsService;
+    private final CustomUserDetailsService
+            userDetailsService;
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationFilter
+            jwtAuthenticationFilter;
 
 
     public SecurityConfig(
@@ -38,8 +42,11 @@ public class SecurityConfig {
             JwtAuthenticationFilter jwtAuthenticationFilter
     ) {
 
-        this.userDetailsService = userDetailsService;
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.userDetailsService =
+                userDetailsService;
+
+        this.jwtAuthenticationFilter =
+                jwtAuthenticationFilter;
     }
 
 
@@ -59,17 +66,19 @@ public class SecurityConfig {
     // ==========================================
 
     @Bean
-
-    public DaoAuthenticationProvider authenticationProvider() {
+    public DaoAuthenticationProvider
+    authenticationProvider() {
 
         DaoAuthenticationProvider provider =
                 new DaoAuthenticationProvider(
                         userDetailsService
                 );
 
+
         provider.setPasswordEncoder(
                 passwordEncoder()
         );
+
 
         return provider;
     }
@@ -80,11 +89,13 @@ public class SecurityConfig {
     // ==========================================
 
     @Bean
-    public AuthenticationManager authenticationManager(
+    public AuthenticationManager
+    authenticationManager(
             AuthenticationConfiguration configuration
     ) throws Exception {
 
-        return configuration.getAuthenticationManager();
+        return configuration
+                .getAuthenticationManager();
     }
 
 
@@ -93,55 +104,151 @@ public class SecurityConfig {
     // ==========================================
 
     @Bean
-    public SecurityFilterChain securityFilterChain(
+    public SecurityFilterChain
+    securityFilterChain(
             HttpSecurity http
     ) throws Exception {
 
         http
 
+                // ------------------------------------------
                 // Disable CSRF
-                .csrf(csrf -> csrf.disable())
+                //
+                // We are using JWT authentication.
+                // ------------------------------------------
+                .csrf(
+                        csrf ->
+                                csrf.disable()
+                )
 
 
+                // ------------------------------------------
                 // Enable CORS
-                .cors(cors ->
-                        cors.configurationSource(
-                                corsConfigurationSource()
-                        )
+                // ------------------------------------------
+                .cors(
+                        cors ->
+                                cors.configurationSource(
+                                        corsConfigurationSource()
+                                )
                 )
 
 
-                // JWT does not use HTTP sessions
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(
-                                SessionCreationPolicy.STATELESS
-                        )
+                // ------------------------------------------
+                // Stateless JWT authentication
+                //
+                // Spring Security will not create
+                // HTTP sessions.
+                // ------------------------------------------
+                .sessionManagement(
+                        session ->
+                                session.sessionCreationPolicy(
+                                        SessionCreationPolicy.STATELESS
+                                )
                 )
 
 
-                // API authorization rules
-                .authorizeHttpRequests(auth -> auth
+                // ------------------------------------------
+                // Authorization rules
+                // ------------------------------------------
+                .authorizeHttpRequests(
+                        auth ->
+                                auth
 
-                        // Public endpoints
-                        .requestMatchers(
-                                "/api/auth/login",
-                                "/api/auth/test"
-                        ).permitAll()
+                                        /*
+                                         * ==================================
+                                         * PUBLIC ENDPOINTS
+                                         * ==================================
+                                         *
+                                         * No JWT is required.
+                                         */
 
 
-                        // Protected endpoints
-                        .requestMatchers(
-                                "/api/auth/me"
-                        ).authenticated()
+                                        /*
+                                         * Existing login endpoint.
+                                         */
+                                        .requestMatchers(
+                                                "/api/auth/login"
+                                        )
+                                        .permitAll()
 
 
-                        // All other endpoints require JWT
-                        .anyRequest().authenticated()
+                                        /*
+                                         * Existing authentication test
+                                         * endpoint.
+                                         *
+                                         * Keep this public only while
+                                         * developing/testing if needed.
+                                         */
+                                        .requestMatchers(
+                                                "/api/auth/test"
+                                        )
+                                        .permitAll()
+
+
+                                        /*
+                                         * ==================================
+                                         * BUSINESS REGISTRATION
+                                         * ==================================
+                                         *
+                                         * Must be public because the CEO
+                                         * account does not exist yet.
+                                         *
+                                         * This endpoint:
+                                         *
+                                         * 1. Creates Business
+                                         * 2. Creates CEO User
+                                         * 3. Links CEO to Business
+                                         */
+                                        .requestMatchers(
+                                                "/api/businesses/register"
+                                        )
+                                        .permitAll()
+
+
+                                        /*
+                                         * ==================================
+                                         * AUTHENTICATED AUTH ENDPOINT
+                                         * ==================================
+                                         */
+                                        .requestMatchers(
+                                                "/api/auth/me"
+                                        )
+                                        .authenticated()
+
+
+                                        /*
+                                         * ==================================
+                                         * EVERYTHING ELSE
+                                         * ==================================
+                                         *
+                                         * Requirement extraction
+                                         * Semantic search
+                                         * Completeness analysis
+                                         * Projects
+                                         * User management
+                                         * etc.
+                                         *
+                                         * All require a valid JWT.
+                                         */
+                                        .anyRequest()
+                                        .authenticated()
                 )
 
 
-                // Add JWT filter before
-                // UsernamePasswordAuthenticationFilter
+                // ------------------------------------------
+                // Authentication Provider
+                // ------------------------------------------
+                .authenticationProvider(
+                        authenticationProvider()
+                )
+
+
+                // ------------------------------------------
+                // JWT Filter
+                //
+                // Runs BEFORE Spring's normal
+                // username/password authentication filter.
+                // ------------------------------------------
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
@@ -157,12 +264,20 @@ public class SecurityConfig {
     // ==========================================
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+    public CorsConfigurationSource
+    corsConfigurationSource() {
 
         CorsConfiguration configuration =
                 new CorsConfiguration();
 
 
+        /*
+         * Frontend URLs allowed to call
+         * the Spring Boot backend.
+         *
+         * If your React frontend runs on
+         * another port, add it here.
+         */
         configuration.setAllowedOrigins(
                 List.of(
                         "http://localhost:3000"
@@ -170,17 +285,27 @@ public class SecurityConfig {
         );
 
 
+        /*
+         * HTTP methods allowed.
+         */
         configuration.setAllowedMethods(
                 List.of(
                         "GET",
                         "POST",
                         "PUT",
+                        "PATCH",
                         "DELETE",
                         "OPTIONS"
                 )
         );
 
 
+        /*
+         * Allow headers such as:
+         *
+         * Authorization
+         * Content-Type
+         */
         configuration.setAllowedHeaders(
                 List.of(
                         "*"
@@ -188,8 +313,22 @@ public class SecurityConfig {
         );
 
 
+        /*
+         * Allow frontend credentials.
+         */
         configuration.setAllowCredentials(
                 true
+        );
+
+
+        /*
+         * Allow frontend JavaScript to read
+         * the Authorization header if needed.
+         */
+        configuration.setExposedHeaders(
+                List.of(
+                        "Authorization"
+                )
         );
 
 

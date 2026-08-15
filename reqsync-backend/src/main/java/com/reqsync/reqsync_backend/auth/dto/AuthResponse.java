@@ -1,5 +1,6 @@
 package com.reqsync.reqsync_backend.auth.dto;
 
+import com.reqsync.reqsync_backend.auth.entity.Role;
 import com.reqsync.reqsync_backend.auth.entity.User;
 
 public class AuthResponse {
@@ -12,12 +13,16 @@ public class AuthResponse {
 
     private String lastName;
 
-    private String role;
+    private Role role;
 
     private String token;
 
     private String message;
 
+
+    // ==========================================
+    // Constructors
+    // ==========================================
 
     public AuthResponse() {
     }
@@ -28,7 +33,7 @@ public class AuthResponse {
             String email,
             String firstName,
             String lastName,
-            String role,
+            Role role,
             String token,
             String message
     ) {
@@ -50,7 +55,7 @@ public class AuthResponse {
 
 
     // ==========================================
-    // Create Auth Response
+    // Factory Method
     // ==========================================
 
     public static AuthResponse from(
@@ -64,7 +69,7 @@ public class AuthResponse {
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getRole().name(),
+                user.getRole(),
                 token,
                 message
         );
@@ -72,40 +77,103 @@ public class AuthResponse {
 
 
     // ==========================================
-    // Getters
+    // Getters / Setters
     // ==========================================
 
     public Long getId() {
+
         return id;
     }
 
 
+    public void setId(
+            Long id
+    ) {
+
+        this.id = id;
+    }
+
+
     public String getEmail() {
+
         return email;
     }
 
 
+    public void setEmail(
+            String email
+    ) {
+
+        this.email = email;
+    }
+
+
     public String getFirstName() {
+
         return firstName;
     }
 
 
+    public void setFirstName(
+            String firstName
+    ) {
+
+        this.firstName = firstName;
+    }
+
+
     public String getLastName() {
+
         return lastName;
     }
 
 
-    public String getRole() {
+    public void setLastName(
+            String lastName
+    ) {
+
+        this.lastName = lastName;
+    }
+
+
+    public Role getRole() {
+
         return role;
     }
 
 
+    public void setRole(
+            Role role
+    ) {
+
+        this.role = role;
+    }
+
+
     public String getToken() {
+
         return token;
     }
 
 
+    public void setToken(
+            String token
+    ) {
+
+        this.token = token;
+    }
+
+
     public String getMessage() {
+
         return message;
+    }
+
+
+    public void setMessage(
+            String message
+    ) {
+
+        this.message = message;
     }
 }

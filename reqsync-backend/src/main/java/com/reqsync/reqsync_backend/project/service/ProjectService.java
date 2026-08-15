@@ -1,11 +1,17 @@
 package com.reqsync.reqsync_backend.project.service;
 
+import com.reqsync.reqsync_backend.auth.entity.Role;
+import com.reqsync.reqsync_backend.auth.entity.User;
+import com.reqsync.reqsync_backend.auth.repository.UserRepository;
 import com.reqsync.reqsync_backend.project.dto.ProjectCreateRequest;
 import com.reqsync.reqsync_backend.project.dto.ProjectResponse;
 import com.reqsync.reqsync_backend.project.dto.ProjectUpdateRequest;
 import com.reqsync.reqsync_backend.project.entity.Project;
 import com.reqsync.reqsync_backend.project.enums.ProjectStatus;
 import com.reqsync.reqsync_backend.project.repository.ProjectRepository;
+import com.reqsync.reqsync_backend.user.service.UserManagementService;
+
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,24 +21,37 @@ import java.util.List;
 @Transactional
 public class ProjectService {
 
+    private final UserRepository userRepository;
     private final ProjectRepository
             projectRepository;
 
-
     public ProjectService(
-            ProjectRepository projectRepository
+            ProjectRepository projectRepository,
+            UserRepository userRepository
     ) {
 
         this.projectRepository =
                 projectRepository;
+
+        this.userRepository =
+                userRepository;
     }
 
 
+    // =========================================================
+    // CREATE PROJECT
+    // =========================================================
+
     /**
      * Create a new project.
+     *
+     * Business ID is NOT sent from frontend.
+     *
+     * It comes from the authenticated CEO.
      */
     public ProjectResponse createProject(
-            ProjectCreateRequest request
+            ProjectCreateRequest request,
+            Authentication authentication
     ) {
 
         validateCreateRequest(
@@ -40,32 +59,112 @@ public class ProjectService {
         );
 
 
+        /*
+         * Find currently authenticated user
+         * using the email stored in JWT.
+         */
+        User currentUser =
+                getAuthenticatedUser(
+                        authentication
+                );
+
+
+        /*
+         * Only CEO can create projects.
+         */
         if (
-                projectRepository
-                        .existsByNameIgnoreCase(
-                                request.getName()
-                        )
+                currentUser.getRole()
+                        != Role.CEO
         ) {
 
             throw new RuntimeException(
-                    "A project with this name already exists."
+                    "Only the CEO can create projects."
             );
         }
 
 
+        Long businessId =
+                currentUser
+                        .getBusiness()
+                        .getId();
+
+
+        /*
+         * Project names need to be unique
+         * only inside the same business.
+         */
+        if (
+                projectRepository
+                        .existsByBusinessIdAndNameIgnoreCase(
+                                businessId,
+                                request.getName().trim()
+                        )
+        ) {
+
+            throw new RuntimeException(
+                    "A project with this name already exists in your business."
+            );
+        }
+
+
+        /*
+         * Calculate project number specifically
+         * for this business.
+         */
+        Integer projectNumber =
+                getNextProjectNumber(
+                        businessId
+                );
+
+
+        /*
+         * Create project.
+         */
         Project project =
                 new Project();
 
-        project.setName(
-                request.getName().trim()
+
+        /*
+         * Automatically link project to
+         * authenticated CEO's business.
+         */
+        project.setBusiness(
+                currentUser.getBusiness()
         );
+
+
+        /*
+         * Business-specific sequence.
+         */
+        project.setProjectNumber(
+                projectNumber
+        );
+
+
+        project.setName(
+                request.getName()
+                        .trim()
+        );
+
 
         project.setDescription(
                 request.getDescription()
         );
 
+
         project.setStatus(
                 ProjectStatus.PLANNING
+        );
+
+
+        /*
+         * Project manager is intentionally
+         * null initially.
+         *
+         * CEO will assign a PM later.
+         */
+        project.setProjectManager(
+                null
         );
 
 
@@ -81,14 +180,35 @@ public class ProjectService {
     }
 
 
+    // =========================================================
+    // GET ALL PROJECTS FOR CURRENT BUSINESS
+    // =========================================================
+
     /**
-     * Get all projects.
+     * Get projects belonging ONLY to the
+     * authenticated user's business.
      */
     @Transactional(readOnly = true)
-    public List<ProjectResponse> getAllProjects() {
+    public List<ProjectResponse> getAllProjects(
+            Authentication authentication
+    ) {
+
+        User currentUser =
+                getAuthenticatedUser(
+                        authentication
+                );
+
+
+        Long businessId =
+                currentUser
+                        .getBusiness()
+                        .getId();
+
 
         return projectRepository
-                .findAll()
+                .findByBusinessId(
+                        businessId
+                )
                 .stream()
                 .map(
                         this::toResponse
@@ -97,17 +217,34 @@ public class ProjectService {
     }
 
 
+    // =========================================================
+    // GET ONE PROJECT
+    // =========================================================
+
     /**
-     * Get one project by ID.
+     * Get one project.
+     *
+     * User can only access projects belonging
+     * to their own business.
      */
     @Transactional(readOnly = true)
     public ProjectResponse getProjectById(
-            Long projectId
+            Long projectId,
+            Authentication authentication
     ) {
 
+        User currentUser =
+                getAuthenticatedUser(
+                        authentication
+                );
+
+
         Project project =
-                getProjectEntity(
-                        projectId
+                getProjectEntityForBusiness(
+                        projectId,
+                        currentUser
+                                .getBusiness()
+                                .getId()
                 );
 
 
@@ -117,17 +254,32 @@ public class ProjectService {
     }
 
 
-    /**
-     * Get projects by status.
-     */
+    // =========================================================
+    // GET PROJECTS BY STATUS
+    // =========================================================
+
     @Transactional(readOnly = true)
     public List<ProjectResponse>
     getProjectsByStatus(
-            ProjectStatus status
+            ProjectStatus status,
+            Authentication authentication
     ) {
 
+        User currentUser =
+                getAuthenticatedUser(
+                        authentication
+                );
+
+
+        Long businessId =
+                currentUser
+                        .getBusiness()
+                        .getId();
+
+
         return projectRepository
-                .findByStatus(
+                .findByBusinessIdAndStatus(
+                        businessId,
                         status
                 )
                 .stream()
@@ -138,12 +290,20 @@ public class ProjectService {
     }
 
 
+    // =========================================================
+    // UPDATE PROJECT
+    // =========================================================
+
     /**
-     * Update a project.
+     * Update project.
+     *
+     * For now only the CEO can modify
+     * basic project information.
      */
     public ProjectResponse updateProject(
             Long projectId,
-            ProjectUpdateRequest request
+            ProjectUpdateRequest request,
+            Authentication authentication
     ) {
 
         if (request == null) {
@@ -154,25 +314,82 @@ public class ProjectService {
         }
 
 
-        Project project =
-                getProjectEntity(
-                        projectId
+        User currentUser =
+                getAuthenticatedUser(
+                        authentication
                 );
 
 
         if (
-                request.getName() != null &&
-                        !request.getName().isBlank()
+                currentUser.getRole()
+                        != Role.CEO
         ) {
 
-            project.setName(
-                    request
-                            .getName()
-                            .trim()
+            throw new RuntimeException(
+                    "Only the CEO can update projects."
             );
         }
 
 
+        Long businessId =
+                currentUser
+                        .getBusiness()
+                        .getId();
+
+
+        Project project =
+                getProjectEntityForBusiness(
+                        projectId,
+                        businessId
+                );
+
+
+        /*
+         * Update name.
+         */
+        if (
+                request.getName() != null
+                        &&
+                        !request.getName().isBlank()
+        ) {
+
+            String newName =
+                    request
+                            .getName()
+                            .trim();
+
+
+            /*
+             * Only perform duplicate check
+             * when the name actually changes.
+             */
+            if (
+                    !newName.equalsIgnoreCase(
+                            project.getName()
+                    )
+                            &&
+                            projectRepository
+                                    .existsByBusinessIdAndNameIgnoreCase(
+                                            businessId,
+                                            newName
+                                    )
+            ) {
+
+                throw new RuntimeException(
+                        "A project with this name already exists in your business."
+                );
+            }
+
+
+            project.setName(
+                    newName
+            );
+        }
+
+
+        /*
+         * Update description.
+         */
         if (
                 request.getDescription()
                         != null
@@ -184,6 +401,9 @@ public class ProjectService {
         }
 
 
+        /*
+         * Update status.
+         */
         if (
                 request.getStatus()
                         != null
@@ -207,36 +427,62 @@ public class ProjectService {
     }
 
 
+    // =========================================================
+    // DELETE PROJECT
+    // =========================================================
+
     /**
      * Delete project.
+     *
+     * Only CEO of the project's business
+     * can delete it.
      */
     public void deleteProject(
-            Long projectId
+            Long projectId,
+            Authentication authentication
     ) {
 
+        User currentUser =
+                getAuthenticatedUser(
+                        authentication
+                );
+
+
         if (
-                !projectRepository
-                        .existsById(
-                                projectId
-                        )
+                currentUser.getRole()
+                        != Role.CEO
         ) {
 
             throw new RuntimeException(
-                    "Project not found: "
-                            + projectId
+                    "Only the CEO can delete projects."
             );
         }
 
 
-        projectRepository.deleteById(
-                projectId
+        Project project =
+                getProjectEntityForBusiness(
+                        projectId,
+                        currentUser
+                                .getBusiness()
+                                .getId()
+                );
+
+
+        projectRepository.delete(
+                project
         );
     }
 
 
+    // =========================================================
+    // GET PROJECT ENTITY
+    // =========================================================
+
     /**
-     * Internal method that other services
-     * can use to verify that a project exists.
+     * General internal project lookup.
+     *
+     * Use this from services where business
+     * checking is performed separately.
      */
     @Transactional(readOnly = true)
     public Project getProjectEntity(
@@ -265,9 +511,154 @@ public class ProjectService {
     }
 
 
+    // =========================================================
+    // BUSINESS-SAFE PROJECT LOOKUP
+    // =========================================================
+
     /**
-     * Validate create request.
+     * Get a project only if it belongs
+     * to the specified business.
+     *
+     * Prevents:
+     *
+     * CEO Business 1
+     *
+     * accessing:
+     *
+     * Project belonging to Business 2
      */
+    @Transactional(readOnly = true)
+    public Project getProjectEntityForBusiness(
+            Long projectId,
+            Long businessId
+    ) {
+
+        if (projectId == null) {
+
+            throw new IllegalArgumentException(
+                    "Project ID cannot be null."
+            );
+        }
+
+
+        if (businessId == null) {
+
+            throw new IllegalArgumentException(
+                    "Business ID cannot be null."
+            );
+        }
+
+
+        return projectRepository
+                .findByIdAndBusinessId(
+                        projectId,
+                        businessId
+                )
+                .orElseThrow(
+                        () ->
+                                new RuntimeException(
+                                        "Project not found or does not belong to your business."
+                                )
+                );
+    }
+
+
+    // =========================================================
+    // PROJECT NUMBER GENERATION
+    // =========================================================
+
+    /**
+     * Generate the next business-specific
+     * project number.
+     *
+     * Example:
+     *
+     * Business 1:
+     *
+     * 1
+     * 2
+     * 3
+     *
+     * returns 4.
+     *
+     *
+     * Business 2:
+     *
+     * 1
+     *
+     * returns 2.
+     */
+    private Integer getNextProjectNumber(
+            Long businessId
+    ) {
+
+        Integer maximumProjectNumber =
+                projectRepository
+                        .findMaximumProjectNumber(
+                                businessId
+                        );
+
+
+        if (
+                maximumProjectNumber == null
+        ) {
+
+            return 1;
+        }
+
+
+        return maximumProjectNumber + 1;
+    }
+
+
+    // =========================================================
+    // AUTHENTICATED USER
+    // =========================================================
+
+    /**
+     * Get the logged-in user from
+     * Spring Security Authentication.
+     *
+     * authentication.getName()
+     * should contain the user's email
+     * because your JWT authentication
+     * uses email as the username.
+     */
+    private User getAuthenticatedUser(
+            Authentication authentication
+    ) {
+
+        if (
+                authentication == null
+                        ||
+                        authentication.getName() == null
+                        ||
+                        authentication.getName().isBlank()
+        ) {
+
+            throw new RuntimeException(
+                    "Authenticated user could not be determined."
+            );
+        }
+
+
+        return userRepository
+                .findByEmailIgnoreCase(
+                        authentication.getName()
+                )
+                .orElseThrow(
+                        () ->
+                                new RuntimeException(
+                                        "Authenticated user was not found."
+                                )
+                );
+    }
+
+
+    // =========================================================
+    // CREATE REQUEST VALIDATION
+    // =========================================================
+
     private void validateCreateRequest(
             ProjectCreateRequest request
     ) {
@@ -281,7 +672,8 @@ public class ProjectService {
 
 
         if (
-                request.getName() == null ||
+                request.getName() == null
+                        ||
                         request.getName().isBlank()
         ) {
 
@@ -291,19 +683,207 @@ public class ProjectService {
         }
     }
 
+    // =========================================================
+// ASSIGN PROJECT MANAGER
+// =========================================================
 
     /**
-     * Convert entity to DTO.
+     * CEO assigns a Project Manager
+     * to one of their projects.
      */
+    public ProjectResponse assignProjectManager(
+            Long projectId,
+            Long managerId,
+            Authentication authentication
+    ) {
+
+        /*
+         * Get CEO from JWT.
+         */
+        User ceo =
+                getAuthenticatedUser(
+                        authentication
+                );
+
+
+        /*
+         * Only CEO can assign PM.
+         */
+        if (
+                ceo.getRole()
+                        != Role.CEO
+        ) {
+
+            throw new RuntimeException(
+                    "Only the CEO can assign project managers."
+            );
+        }
+
+
+        Long businessId =
+                ceo
+                        .getBusiness()
+                        .getId();
+
+
+        /*
+         * Get project, but ONLY if it belongs
+         * to CEO's business.
+         */
+        Project project =
+                projectRepository
+                        .findByIdAndBusinessId(
+                                projectId,
+                                businessId
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new RuntimeException(
+                                                "Project not found or does not belong to your business."
+                                        )
+                        );
+
+
+        /*
+         * Get selected manager, but ONLY if
+         * they belong to CEO's business.
+         */
+        User projectManager =
+                userRepository
+                        .findByIdAndBusinessId(
+                                managerId,
+                                businessId
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new RuntimeException(
+                                                "User not found or does not belong to your business."
+                                        )
+                        );
+
+
+        /*
+         * Verify role.
+         */
+        if (
+                projectManager.getRole()
+                        != Role.PROJECT_MANAGER
+        ) {
+
+            throw new RuntimeException(
+                    "Selected user is not a Project Manager."
+            );
+        }
+
+
+        /*
+         * Account should be active.
+         */
+        if (
+                !projectManager.isEnabled()
+        ) {
+
+            throw new RuntimeException(
+                    "Selected Project Manager account is disabled."
+            );
+        }
+
+
+        if (
+                projectManager.isAccountLocked()
+        ) {
+
+            throw new RuntimeException(
+                    "Selected Project Manager account is locked."
+            );
+        }
+
+
+        /*
+         * Assign PM.
+         */
+        project.setProjectManager(
+                projectManager
+        );
+
+
+        Project savedProject =
+                projectRepository.save(
+                        project
+                );
+
+
+        return toResponse(
+                savedProject
+        );
+    }
+
+    // =========================================================
+    // DTO CONVERSION
+    // =========================================================
+
     private ProjectResponse toResponse(
             Project project
     ) {
 
+        Long businessId =
+                null;
+
+        Long projectManagerId =
+                null;
+
+        String projectManagerName =
+                null;
+
+
+        if (
+                project.getBusiness() != null
+        ) {
+
+            businessId =
+                    project.getBusiness()
+                            .getId();
+        }
+
+
+        if (
+                project.getProjectManager()
+                        != null
+        ) {
+
+            projectManagerId =
+                    project.getProjectManager()
+                            .getId();
+
+
+            String firstName =
+                    project.getProjectManager()
+                            .getFirstName();
+
+            String lastName =
+                    project.getProjectManager()
+                            .getLastName();
+
+
+            projectManagerName =
+                    (
+                            firstName
+                                    + " "
+                                    + lastName
+                    )
+                            .trim();
+        }
+
+
         return new ProjectResponse(
                 project.getId(),
+                businessId,
+                project.getProjectNumber(),
                 project.getName(),
                 project.getDescription(),
                 project.getStatus(),
+                projectManagerId,
+                projectManagerName,
                 project.getCreatedAt(),
                 project.getUpdatedAt()
         );
