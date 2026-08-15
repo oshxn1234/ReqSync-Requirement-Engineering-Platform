@@ -7,7 +7,7 @@ import com.reqsync.reqsync_backend.requirement.service.RequirementCompletenessSe
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-//@RestController
+@RestController
 @RequestMapping("/api")
 public class RequirementCompletenessController {
 
@@ -34,9 +34,8 @@ public class RequirementCompletenessController {
     /**
      * Analyze ONE selected requirement.
      *
-     * Example:
+     * POST:
      *
-     * POST
      * /api/requirements/5/completeness
      */
     @PostMapping(
@@ -65,11 +64,10 @@ public class RequirementCompletenessController {
 
     /**
      * Analyze ALL requirements
-     * belonging to one project.
+     * belonging to a project.
      *
-     * Example:
+     * POST:
      *
-     * POST
      * /api/projects/1/requirements/completeness
      */
     @PostMapping(
