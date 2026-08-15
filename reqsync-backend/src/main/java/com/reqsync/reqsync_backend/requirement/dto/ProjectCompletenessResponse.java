@@ -14,13 +14,22 @@ public class ProjectCompletenessResponse {
 
     private CompletenessStatus status;
 
-    private List<CompletenessCriterionResponse> criteria;
+    private List<CompletenessCriterionResponse>
+            criteria;
 
-    private List<CoverageCheckResponse> coverageResults;
+    private List<CoverageCheckResponse>
+            coverageChecks;
 
-    private List<String> missingRequirements;
+    private List<String>
+            confirmedMissing;
 
-    private List<String> suggestions;
+    private List<String>
+            suggestions;
+
+
+    public ProjectCompletenessResponse() {
+    }
+
 
     public ProjectCompletenessResponse(
             Long projectId,
@@ -28,50 +37,137 @@ public class ProjectCompletenessResponse {
             int completenessScore,
             CompletenessStatus status,
             List<CompletenessCriterionResponse> criteria,
-            List<CoverageCheckResponse> coverageResults,
-            List<String> missingRequirements,
+            List<CoverageCheckResponse> coverageChecks,
+            List<String> confirmedMissing,
             List<String> suggestions
     ) {
 
-        this.projectId = projectId;
-        this.requirementCount = requirementCount;
-        this.completenessScore = completenessScore;
-        this.status = status;
-        this.criteria = criteria;
-        this.coverageResults = coverageResults;
-        this.missingRequirements = missingRequirements;
-        this.suggestions = suggestions;
+        this.projectId =
+                projectId;
+
+        this.requirementCount =
+                requirementCount;
+
+        this.completenessScore =
+                completenessScore;
+
+        this.status =
+                status;
+
+        this.criteria =
+                criteria;
+
+        this.coverageChecks =
+                coverageChecks;
+
+        this.confirmedMissing =
+                confirmedMissing;
+
+        this.suggestions =
+                suggestions;
     }
+
 
     public Long getProjectId() {
         return projectId;
     }
 
+
+    public void setProjectId(
+            Long projectId
+    ) {
+        this.projectId = projectId;
+    }
+
+
     public int getRequirementCount() {
         return requirementCount;
     }
+
+
+    public void setRequirementCount(
+            int requirementCount
+    ) {
+        this.requirementCount =
+                requirementCount;
+    }
+
 
     public int getCompletenessScore() {
         return completenessScore;
     }
 
+
+    public void setCompletenessScore(
+            int completenessScore
+    ) {
+        this.completenessScore =
+                completenessScore;
+    }
+
+
     public CompletenessStatus getStatus() {
         return status;
     }
 
-    public List<CompletenessCriterionResponse> getCriteria() {
+
+    public void setStatus(
+            CompletenessStatus status
+    ) {
+        this.status = status;
+    }
+
+
+    public List<CompletenessCriterionResponse>
+    getCriteria() {
+
         return criteria;
     }
 
-    public List<CoverageCheckResponse> getCoverageResults() {
-        return coverageResults;
+
+    public void setCriteria(
+            List<CompletenessCriterionResponse> criteria
+    ) {
+        this.criteria = criteria;
     }
 
-    public List<String> getMissingRequirements() {
-        return missingRequirements;
+
+    public List<CoverageCheckResponse>
+    getCoverageChecks() {
+
+        return coverageChecks;
     }
+
+
+    public void setCoverageChecks(
+            List<CoverageCheckResponse> coverageChecks
+    ) {
+        this.coverageChecks =
+                coverageChecks;
+    }
+
+
+    public List<String> getConfirmedMissing() {
+        return confirmedMissing;
+    }
+
+
+    public void setConfirmedMissing(
+            List<String> confirmedMissing
+    ) {
+        this.confirmedMissing =
+                confirmedMissing;
+    }
+
 
     public List<String> getSuggestions() {
         return suggestions;
+    }
+
+
+    public void setSuggestions(
+            List<String> suggestions
+    ) {
+        this.suggestions = suggestions;
     }
 }

@@ -2,12 +2,15 @@ package com.reqsync.reqsync_backend.requirement.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.reqsync.reqsync_backend.ai.client.GeminiClient;
-import com.reqsync.reqsync_backend.requirement.dto.*;
+import com.reqsync.reqsync_backend.requirement.dto.CoverageCheckResponse;
+import com.reqsync.reqsync_backend.requirement.dto.InitialCompletenessResult;
+import com.reqsync.reqsync_backend.requirement.dto.PotentialGapResponse;
+import com.reqsync.reqsync_backend.requirement.dto.RequirementCompletenessResponse;
 import com.reqsync.reqsync_backend.requirement.entity.Requirement;
 import com.reqsync.reqsync_backend.requirement.enums.CompletenessStatus;
 import com.reqsync.reqsync_backend.requirement.enums.CoverageStatus;
 import com.reqsync.reqsync_backend.requirement.repository.RequirementRepository;
-import com.reqsync.reqsync_backend.requirement.service.semantic.SemanticSearchService;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,26 +21,18 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class RequirementCompletenessService {
 
-    private final RequirementRepository
-            requirementRepository;
+    private final RequirementRepository requirementRepository;
 
-    private final GeminiClient
-            geminiClient;
+    private final GeminiClient geminiClient;
 
-    private final SemanticSearchService
-            semanticSearchService;
+    private final CompletenessScoreService completenessScoreService;
 
-    private final CompletenessScoreService
-            completenessScoreService;
-
-    private final ObjectMapper
-            objectMapper;
+    private final ObjectMapper objectMapper;
 
 
     public RequirementCompletenessService(
             RequirementRepository requirementRepository,
             GeminiClient geminiClient,
-            SemanticSearchService semanticSearchService,
             CompletenessScoreService completenessScoreService,
             ObjectMapper objectMapper
     ) {
@@ -48,9 +43,6 @@ public class RequirementCompletenessService {
         this.geminiClient =
                 geminiClient;
 
-        this.semanticSearchService =
-                semanticSearchService;
-
         this.completenessScoreService =
                 completenessScoreService;
 
@@ -60,11 +52,17 @@ public class RequirementCompletenessService {
 
 
     /**
-     * Analyze ONE requirement.
+     * Analyze one selected requirement.
      *
-     * However, possible gaps are checked
-     * against ALL OTHER requirements
-     * within the same project.
+     * This version does NOT require pgvector.
+     *
+     * Flow:
+     *
+     * 1. Gemini analyzes selected requirement.
+     * 2. Load other requirements from same project.
+     * 3. Gemini checks whether potential gaps are already
+     *    covered by another requirement.
+     * 4. Calculate completeness score.
      */
     public RequirementCompletenessResponse analyze(
             Long requirementId
@@ -84,35 +82,9 @@ public class RequirementCompletenessService {
                         );
 
 
-        Long projectId =
-                selectedRequirement
-                        .getProjectId();
-
-
-        /*
-         * Make sure project actually has
-         * requirements stored.
-         */
-        List<Requirement> projectRequirements =
-                requirementRepository
-                        .findByProjectId(
-                                projectId
-                        );
-
-
-        if (projectRequirements.isEmpty()) {
-
-            throw new RuntimeException(
-                    "No requirements found for project: "
-                            + projectId
-            );
-        }
-
-
         /*
          * STEP 1
-         *
-         * Analyze ONLY selected requirement.
+         * Analyze selected requirement itself.
          */
         InitialCompletenessResult initialResult =
                 analyzeSelectedRequirement(
@@ -120,14 +92,67 @@ public class RequirementCompletenessService {
                 );
 
 
+        if (
+                initialResult.getCriteria() == null
+        ) {
+
+            initialResult.setCriteria(
+                    new ArrayList<>()
+            );
+        }
+
+
+        if (
+                initialResult.getPotentialGaps() == null
+        ) {
+
+            initialResult.setPotentialGaps(
+                    new ArrayList<>()
+            );
+        }
+
+
+        if (
+                initialResult.getSuggestions() == null
+        ) {
+
+            initialResult.setSuggestions(
+                    new ArrayList<>()
+            );
+        }
+
+
         /*
          * STEP 2
-         *
-         * Check every potential gap
-         * against ALL OTHER project requirements.
+         * Get all requirements from same project.
          */
+        List<Requirement> projectRequirements =
+                requirementRepository
+                        .findByProjectId(
+                                selectedRequirement
+                                        .getProjectId()
+                        );
+
+
+        /*
+         * Remove currently selected requirement.
+         */
+        List<Requirement> otherRequirements =
+                projectRequirements
+                        .stream()
+                        .filter(
+                                requirement ->
+                                        !requirement
+                                                .getId()
+                                                .equals(
+                                                        requirementId
+                                                )
+                        )
+                        .toList();
+
+
         List<CoverageCheckResponse>
-                coverageResults =
+                coverageChecks =
                 new ArrayList<>();
 
 
@@ -136,66 +161,37 @@ public class RequirementCompletenessService {
                 new ArrayList<>();
 
 
+        /*
+         * STEP 3
+         * Validate every possible gap using Gemini
+         * against other existing requirements.
+         *
+         * No pgvector.
+         * No embedding.
+         */
         for (
                 PotentialGapResponse gap
                 : initialResult.getPotentialGaps()
         ) {
 
-            String semanticQuery =
-                    gap.getTopic()
-                            + ". "
-                            + gap.getDescription();
+            if (
+                    gap == null ||
+                            gap.getDescription() == null ||
+                            gap.getDescription().isBlank()
+            ) {
 
-
-            List<SimilarRequirementResponse>
-                    semanticMatches =
-                    semanticSearchService
-                            .searchProject(
-                                    projectId,
-                                    semanticQuery,
-                                    5
-                            );
-
-
-            /*
-             * 0.70 is only the starting threshold.
-             * You can adjust it after testing.
-             */
-            List<SimilarRequirementResponse>
-                    strongMatches =
-                    semanticMatches
-                            .stream()
-                            .filter(
-                                    match ->
-                                            match.getSimilarity()
-                                                    >= 0.70
-                            )
-                            .limit(3)
-                            .toList();
-
-
-            CoverageCheckResponse
-                    coverageResult;
-
-
-            if (strongMatches.isEmpty()) {
-
-                coverageResult =
-                        createMissingCoverage(
-                                gap
-                        );
-
-            } else {
-
-                coverageResult =
-                        validateCoverageUsingGemini(
-                                gap,
-                                strongMatches
-                        );
+                continue;
             }
 
 
-            coverageResults.add(
+            CoverageCheckResponse coverageResult =
+                    validateCoverageWithGemini(
+                            gap,
+                            otherRequirements
+                    );
+
+
+            coverageChecks.add(
                     coverageResult
             );
 
@@ -213,30 +209,30 @@ public class RequirementCompletenessService {
 
 
         /*
-         * STEP 3
-         *
-         * ReqSync calculates score.
+         * STEP 4
+         * Calculate final score.
          */
-        int completenessScore =
-                completenessScoreService.calculate(
-                        initialResult.getCriteria(),
-                        confirmedMissing.size()
-                );
+        int score =
+                completenessScoreService
+                        .calculate(
+                                initialResult.getCriteria(),
+                                confirmedMissing.size()
+                        );
 
 
         CompletenessStatus status =
-                determineCompletenessStatus(
-                        completenessScore
+                determineStatus(
+                        score
                 );
 
 
         return new RequirementCompletenessResponse(
                 selectedRequirement.getId(),
                 selectedRequirement.getCode(),
-                completenessScore,
+                score,
                 status,
                 initialResult.getCriteria(),
-                coverageResults,
+                coverageChecks,
                 confirmedMissing,
                 initialResult.getSuggestions()
         );
@@ -244,20 +240,18 @@ public class RequirementCompletenessService {
 
 
     /**
-     * Gemini analyzes the selected
-     * requirement itself.
+     * Initial AI analysis of selected requirement.
      */
     private InitialCompletenessResult
     analyzeSelectedRequirement(
             Requirement requirement
     ) {
 
-        String prompt = """
-                You are a professional software
-                requirements engineering expert.
+        String prompt =
+                """
+                You are a software requirements engineering expert.
 
-                Analyze ONLY the following selected
-                software requirement.
+                Analyze ONLY the selected software requirement below.
 
                 Requirement Code:
                 %s
@@ -268,9 +262,17 @@ public class RequirementCompletenessService {
                 Description:
                 %s
 
+                Actor:
+                %s
 
-                Evaluate the requirement using
-                the following completeness criteria:
+                Preconditions:
+                %s
+
+                Expected Outcome:
+                %s
+
+
+                Evaluate the requirement using these criteria:
 
                 ACTOR
                 ACTION
@@ -284,32 +286,41 @@ public class RequirementCompletenessService {
                 TESTABILITY
 
 
-                For each criterion return exactly:
+                For each criterion return one of:
 
                 PASS
                 PARTIAL
                 FAIL
 
 
-                Also identify POSSIBLE related
-                requirements that might be missing.
+                PASS:
+                The criterion is clearly satisfied.
+
+                PARTIAL:
+                Some information exists but it is incomplete
+                or insufficiently clear.
+
+                FAIL:
+                Important information for the criterion is absent
+                or unusable.
+
+
+                Also identify possible related requirement areas
+                that may be missing.
 
                 IMPORTANT:
 
-                Do NOT assume a potential gap is
-                truly missing.
+                A possible gap is NOT automatically confirmed
+                missing.
 
-                Another stored requirement in
-                the same project may already
-                cover that concept.
+                Another requirement in the same project may
+                already cover it.
 
-                ReqSync will perform semantic
-                search after this analysis.
-
+                Do not invent unrelated requirements.
 
                 Return ONLY valid JSON.
 
-                Do not include Markdown.
+                Do not use Markdown.
 
                 Return exactly:
 
@@ -318,26 +329,40 @@ public class RequirementCompletenessService {
                     {
                       "criterion": "ACTOR",
                       "status": "PASS",
-                      "explanation": "The actor is clearly identified."
+                      "explanation": "The customer is clearly identified."
                     }
                   ],
-
                   "potentialGaps": [
                     {
                       "topic": "Password Recovery",
-                      "description": "Users may require a password recovery mechanism."
+                      "description": "A related password recovery requirement may be needed."
                     }
                   ],
-
                   "suggestions": [
-                    "Specify expected system behavior when registration fails."
+                    "Specify what happens when authentication fails."
                   ]
                 }
-                """.formatted(
-                requirement.getCode(),
-                requirement.getTitle(),
-                requirement.getDescription()
-        );
+                """
+                        .formatted(
+                                safe(
+                                        requirement.getCode()
+                                ),
+                                safe(
+                                        requirement.getTitle()
+                                ),
+                                safe(
+                                        requirement.getDescription()
+                                ),
+                                safe(
+                                        requirement.getActors()
+                                ),
+                                safe(
+                                        requirement.getPreconditions()
+                                ),
+                                safe(
+                                        requirement.getExpectedOutcome()
+                                )
+                        );
 
 
         String aiResponse =
@@ -358,7 +383,7 @@ public class RequirementCompletenessService {
         } catch (Exception exception) {
 
             throw new RuntimeException(
-                    "Unable to parse Gemini completeness analysis.",
+                    "Unable to parse requirement completeness response.",
                     exception
             );
         }
@@ -366,47 +391,76 @@ public class RequirementCompletenessService {
 
 
     /**
-     * Semantic search found related requirements.
+     * Validate possible gap against all other requirements
+     * using Gemini directly.
      *
-     * Gemini now determines whether those
-     * requirements actually cover the gap.
+     * This replaces pgvector semantic search.
      */
     private CoverageCheckResponse
-    validateCoverageUsingGemini(
+    validateCoverageWithGemini(
             PotentialGapResponse gap,
-            List<SimilarRequirementResponse> matches
+            List<Requirement> otherRequirements
     ) {
 
-        StringBuilder requirementContext =
+        if (
+                otherRequirements == null ||
+                        otherRequirements.isEmpty()
+        ) {
+
+            return createMissingCoverage(
+                    gap
+            );
+        }
+
+
+        StringBuilder context =
                 new StringBuilder();
 
 
         for (
-                SimilarRequirementResponse match
-                : matches
+                Requirement requirement
+                : otherRequirements
         ) {
 
-            requirementContext
+            context
                     .append(
-                            match.getCode()
+                            "Code: "
                     )
-                    .append(" | ")
                     .append(
-                            match.getTitle()
+                            safe(
+                                    requirement.getCode()
+                            )
                     )
-                    .append(" | ")
+                    .append("\n")
+
                     .append(
-                            match.getDescription()
+                            "Title: "
                     )
-                    .append("\n");
+                    .append(
+                            safe(
+                                    requirement.getTitle()
+                            )
+                    )
+                    .append("\n")
+
+                    .append(
+                            "Description: "
+                    )
+                    .append(
+                            safe(
+                                    requirement.getDescription()
+                            )
+                    )
+                    .append("\n\n");
         }
 
 
-        String prompt = """
-                You are performing software
-                requirement coverage analysis.
+        String prompt =
+                """
+                You are performing software requirement
+                coverage validation.
 
-                Potential gap:
+                Possible requirement gap:
 
                 Topic:
                 %s
@@ -415,45 +469,60 @@ public class RequirementCompletenessService {
                 %s
 
 
-                Existing semantically related
-                requirements:
+                Existing requirements from the SAME project:
 
                 %s
 
 
-                Determine whether this potential
-                gap is:
+                Determine whether the possible gap is:
 
                 COVERED
 
-                = An existing requirement fully
+                = One existing requirement sufficiently
                   addresses the concept.
 
                 PARTIALLY_COVERED
 
-                = An existing requirement addresses
-                  part of the concept but important
-                  details remain missing.
+                = An existing requirement addresses part
+                  of the concept, but important information
+                  remains missing.
 
                 MISSING
 
-                = None of these requirements
+                = None of the existing requirements
                   adequately addresses the concept.
 
 
-                Return ONLY valid JSON:
+                Compare semantic meaning, not only exact words.
+
+                If covered or partially covered,
+                return the best matching requirement code.
+
+                If missing,
+                relatedRequirementCode must be null.
+
+                Return ONLY valid JSON.
+
+                Do not use Markdown.
+
+                Return exactly:
 
                 {
                   "topic": "...",
                   "status": "COVERED",
-                  "relatedRequirementCode": "REQ-001",
-                  "reason": "..."
+                  "relatedRequirementCode": "REQ-003",
+                  "reason": "The password reset requirement already covers this concept."
                 }
-                """.formatted(
-                gap.getTopic(),
-                gap.getDescription(),
-                requirementContext
-        );
+                """
+                        .formatted(
+                                safe(
+                                        gap.getTopic()
+                                ),
+                                safe(
+                                        gap.getDescription()
+                                ),
+                                context
+                        );
 
 
         String aiResponse =
@@ -464,17 +533,45 @@ public class RequirementCompletenessService {
 
         try {
 
-            return objectMapper.readValue(
-                    cleanJsonResponse(
-                            aiResponse
-                    ),
-                    CoverageCheckResponse.class
-            );
+            CoverageCheckResponse result =
+                    objectMapper.readValue(
+                            cleanJsonResponse(
+                                    aiResponse
+                            ),
+                            CoverageCheckResponse.class
+                    );
+
+
+            /*
+             * Defensive fallback.
+             */
+            if (
+                    result.getTopic() == null ||
+                            result.getTopic().isBlank()
+            ) {
+
+                result.setTopic(
+                        gap.getTopic()
+                );
+            }
+
+
+            if (
+                    result.getStatus() == null
+            ) {
+
+                result.setStatus(
+                        CoverageStatus.MISSING
+                );
+            }
+
+
+            return result;
 
         } catch (Exception exception) {
 
             throw new RuntimeException(
-                    "Unable to parse requirement coverage analysis.",
+                    "Unable to parse requirement coverage result.",
                     exception
             );
         }
@@ -486,60 +583,47 @@ public class RequirementCompletenessService {
             PotentialGapResponse gap
     ) {
 
-        CoverageCheckResponse response =
-                new CoverageCheckResponse();
-
-
-        response.setTopic(
-                gap.getTopic()
+        return new CoverageCheckResponse(
+                gap.getTopic(),
+                CoverageStatus.MISSING,
+                null,
+                "No other requirement in the same project covers this potential gap."
         );
-
-        response.setStatus(
-                CoverageStatus.MISSING
-        );
-
-        response.setRelatedRequirementCode(
-                null
-        );
-
-        response.setReason(
-                "No sufficiently similar requirement was found in the project."
-        );
-
-
-        return response;
     }
 
 
-    private CompletenessStatus
-    determineCompletenessStatus(
+    private CompletenessStatus determineStatus(
             int score
     ) {
 
-        if (score >= 85) {
+        if (
+                score >= 85
+        ) {
 
             return CompletenessStatus.COMPLETE;
         }
 
-        if (score >= 60) {
+
+        if (
+                score >= 60
+        ) {
 
             return CompletenessStatus.NEEDS_IMPROVEMENT;
         }
+
 
         return CompletenessStatus.INCOMPLETE;
     }
 
 
-    /**
-     * Remove Markdown fences if Gemini
-     * accidentally returns them.
-     */
     private String cleanJsonResponse(
             String response
     ) {
 
-        if (response == null ||
-                response.isBlank()) {
+        if (
+                response == null ||
+                        response.isBlank()
+        ) {
 
             throw new RuntimeException(
                     "Gemini returned an empty response."
@@ -592,5 +676,15 @@ public class RequirementCompletenessService {
 
 
         return cleaned.trim();
+    }
+
+
+    private String safe(
+            String value
+    ) {
+
+        return value == null
+                ? ""
+                : value;
     }
 }
