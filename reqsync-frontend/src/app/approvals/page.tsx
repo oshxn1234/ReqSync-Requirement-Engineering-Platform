@@ -2,13 +2,72 @@
 
 import { useEffect, useState } from 'react';
 import { useProjectStore, Approval } from '@/store/projectStore';
+import { useBackendProjectStore } from '@/store/backendProjectStore';
+import { fetchApprovalsForProject, approveApprovalApi, rejectApprovalApi } from '@/lib/approvals-api';
 import { FileCheck, Check, X, Clock, User, Calendar, Filter } from 'lucide-react';
 
 export default function ApprovalsPage() {
   const [mounted, setMounted] = useState(false);
   const approvals = useProjectStore((state) => state.approvals);
+  const setApprovals = useProjectStore((state) => state.setApprovals);
   const approveApproval = useProjectStore((state) => state.approveApproval);
   const rejectApproval = useProjectStore((state) => state.rejectApproval);
+
+  const selectedProjectId = useBackendProjectStore((s) => s.selectedProjectId);
+
+  const [remoteError, setRemoteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedProjectId === null) return;
+    let cancelled = false;
+
+    fetchApprovalsForProject(selectedProjectId)
+      .then((data) => {
+        if (cancelled) return;
+        const remoteApprovals: Approval[] = data.map((item) => ({
+          id: item.id,
+          title: item.title,
+          type: item.type,
+          requestedBy: item.requestedBy,
+          requestedOn: item.requestedOn,
+          status: item.status,
+        }));
+        setApprovals(remoteApprovals);
+        setRemoteError(null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setRemoteError('Could not load approvals from the backend; showing local data.');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProjectId, setApprovals]);
+
+  const handleApprove = async (app: Approval) => {
+    setRemoteError(null);
+    try {
+      await approveApprovalApi(app.id);
+      approveApproval(app.id);
+    } catch {
+      // fallback to local store
+      approveApproval(app.id);
+      setRemoteError('Backend approval endpoint not available; applied locally.');
+    }
+  };
+
+  const handleReject = async (app: Approval) => {
+    setRemoteError(null);
+    try {
+      await rejectApprovalApi(app.id);
+      rejectApproval(app.id);
+    } catch {
+      // fallback to local store
+      rejectApproval(app.id);
+      setRemoteError('Backend reject endpoint not available; applied locally.');
+    }
+  };
 
   const [activeTab, setActiveTab] = useState<'All' | 'Pending' | 'Approved' | 'Rejected'>('Pending');
   const [typeFilter, setTypeFilter] = useState<'All' | 'Requirement' | 'Baseline' | 'Change Request'>('All');
@@ -82,6 +141,12 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
+      {remoteError && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold px-4 py-3 rounded-xl">
+          {remoteError}
+        </div>
+      )}
+
       {/* Summary KPI grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-2xs">
@@ -131,7 +196,7 @@ export default function ApprovalsPage() {
           <Filter className="w-4 h-4 text-slate-400" />
           <select
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as any)}
+            onChange={(e) => setTypeFilter(e.target.value as 'All' | 'Requirement' | 'Baseline' | 'Change Request')}
             className="text-xs border border-slate-200 rounded-xl bg-slate-50 text-slate-700 px-3 py-2 focus:outline-none focus:border-blue-500 focus:bg-white"
           >
             <option value="All">All Types</option>
@@ -184,14 +249,14 @@ export default function ApprovalsPage() {
               {app.status === 'Pending' && (
                 <div className="flex gap-2 self-end md:self-center shrink-0">
                   <button
-                    onClick={() => rejectApproval(app.id)}
+                    onClick={() => void handleReject(app)}
                     className="flex items-center gap-1 border border-rose-200 hover:border-rose-300 bg-rose-50/50 hover:bg-rose-50 text-rose-700 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                     <span>Reject</span>
                   </button>
                   <button
-                    onClick={() => approveApproval(app.id)}
+                    onClick={() => void handleApprove(app)}
                     className="flex items-center gap-1 border border-emerald-200 hover:border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
                   >
                     <Check className="w-4 h-4" />

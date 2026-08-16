@@ -139,6 +139,10 @@ Record<string, string[]> = {
     'Project Manager',
     'Business Analyst'
   ],
+  '/srs': [
+    'Project Manager',
+    'Business Analyst'
+  ],
 };
 
 
@@ -245,6 +249,12 @@ const navItems = [
     name: 'Knowledge Vault',
     href: '/knowledge-vault',
     icon: Database
+  },
+
+  {
+    name: 'SRS',
+    href: '/srs',
+    icon: FileText
   },
 
 
