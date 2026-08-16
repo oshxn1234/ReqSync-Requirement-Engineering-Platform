@@ -33,7 +33,7 @@ public class KnowledgeDataInitializer {
                     "K-01",
                     "Payment Gateway Requirements & API Specifications",
                     "Online Banking System",
-                    KnowledgeCategory.REQUIREMENTS,
+                    KnowledgeCategory.fromValue("Requirements"),
                     "2026-06-12"
             );
 
@@ -42,7 +42,7 @@ public class KnowledgeDataInitializer {
                     "K-02",
                     "Two-Factor Authentication Architecture Decisions",
                     "Banking App 2025",
-                    KnowledgeCategory.DECISIONS,
+                    KnowledgeCategory.fromValue("Decisions"),
                     "2026-06-10"
             );
 
@@ -51,7 +51,7 @@ public class KnowledgeDataInitializer {
                     "K-03",
                     "Performance Testing Lessons and Index Optimization",
                     "General",
-                    KnowledgeCategory.LESSONS_LEARNED,
+                    KnowledgeCategory.fromValue("Lessons Learned"),
                     "2026-06-08"
             );
 
@@ -60,7 +60,7 @@ public class KnowledgeDataInitializer {
                     "K-04",
                     "Common Login Security Issues and Remediation Policies",
                     "Online Banking System",
-                    KnowledgeCategory.QA_FINDINGS,
+                    KnowledgeCategory.fromValue("QA Findings"),
                     "2026-06-05"
             );
 
@@ -69,7 +69,7 @@ public class KnowledgeDataInitializer {
                     "K-05",
                     "Software Requirement Specification (SRS) Standard Template v3.0",
                     "Internal",
-                    KnowledgeCategory.TEMPLATES,
+                    KnowledgeCategory.fromValue("Templates"),
                     "2026-06-01"
             );
         };

@@ -3,6 +3,7 @@ package com.reqsync.reqsync_backend.project.service;
 import com.reqsync.reqsync_backend.auth.entity.Role;
 import com.reqsync.reqsync_backend.auth.entity.User;
 import com.reqsync.reqsync_backend.auth.repository.UserRepository;
+import com.reqsync.reqsync_backend.knowledge.service.KnowledgeService;
 import com.reqsync.reqsync_backend.project.dto.ProjectCreateRequest;
 import com.reqsync.reqsync_backend.project.dto.ProjectResponse;
 import com.reqsync.reqsync_backend.project.dto.ProjectUpdateRequest;
@@ -25,9 +26,13 @@ public class ProjectService {
     private final ProjectRepository
             projectRepository;
 
+    private final KnowledgeService
+            knowledgeService;
+
     public ProjectService(
             ProjectRepository projectRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            KnowledgeService knowledgeService
     ) {
 
         this.projectRepository =
@@ -35,6 +40,9 @@ public class ProjectService {
 
         this.userRepository =
                 userRepository;
+
+        this.knowledgeService =
+                knowledgeService;
     }
 
 
@@ -343,6 +351,9 @@ public class ProjectService {
                         businessId
                 );
 
+        ProjectStatus previousStatus =
+                project.getStatus();
+
 
         /*
          * Update name.
@@ -419,6 +430,27 @@ public class ProjectService {
                 projectRepository.save(
                         project
                 );
+
+
+        /*
+         * When a project transitions to COMPLETED,
+         * publish its SRS documents into the
+         * Knowledge Vault so other projects can
+         * reuse the historical data.
+         */
+        if (
+                updatedProject.getStatus()
+                        == ProjectStatus.COMPLETED
+                        &&
+                        previousStatus
+                                != ProjectStatus.COMPLETED
+        ) {
+
+            knowledgeService
+                    .publishProjectToVault(
+                            updatedProject
+                    );
+        }
 
 
         return toResponse(

@@ -12,18 +12,20 @@ public interface KnowledgeItemRepository
         extends JpaRepository<KnowledgeItem, Long> {
 
     /**
-     * Return shared vault items plus the items
-     * linked to the requested project.
-     */
-    List<KnowledgeItem>
-    findByProjectIdIsNullOrProjectIdOrderByIdAsc(
-            Long projectId
-    );
-
-
-    /**
      * Return every vault item.
      */
     List<KnowledgeItem>
     findAllByOrderByIdAsc();
+
+    /**
+     * Whether a vault item already references a
+     * specific document (e.g. an SRS document).
+     *
+     * Used to avoid publishing duplicate entries
+     * when a project is marked as completed.
+     */
+    boolean existsByReferenceTypeAndReferenceId(
+            String referenceType,
+            Long referenceId
+    );
 }

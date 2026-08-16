@@ -98,6 +98,31 @@ public class KnowledgeItem {
 
 
     // ==========================================
+    // Optional link to a generated document
+    // ==========================================
+
+    /**
+     * Document kind that this knowledge item points to.
+     *
+     * Example: "SRS"
+     */
+    @Column(
+            name = "reference_type",
+            length = 40
+    )
+    private String referenceType;
+
+
+    /**
+     * Backend document id that this item points to.
+     */
+    @Column(
+            name = "reference_id"
+    )
+    private Long referenceId;
+
+
+    // ==========================================
     // Vault date
     // ==========================================
 
@@ -244,6 +269,28 @@ public class KnowledgeItem {
             LocalDate date
     ) {
         this.date = date;
+    }
+
+
+    public String getReferenceType() {
+        return referenceType;
+    }
+
+    public void setReferenceType(
+            String referenceType
+    ) {
+        this.referenceType = referenceType;
+    }
+
+
+    public Long getReferenceId() {
+        return referenceId;
+    }
+
+    public void setReferenceId(
+            Long referenceId
+    ) {
+        this.referenceId = referenceId;
     }
 
 

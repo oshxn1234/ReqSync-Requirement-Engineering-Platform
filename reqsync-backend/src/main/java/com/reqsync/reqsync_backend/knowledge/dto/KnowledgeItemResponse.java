@@ -14,6 +14,10 @@ public class KnowledgeItemResponse {
 
     private String date;
 
+    private String referenceType;
+
+    private Long referenceId;
+
 
     public KnowledgeItemResponse() {
     }
@@ -32,6 +36,26 @@ public class KnowledgeItemResponse {
         this.project = project;
         this.category = category;
         this.date = date;
+    }
+
+
+    public KnowledgeItemResponse(
+            String id,
+            String title,
+            String project,
+            KnowledgeCategory category,
+            String date,
+            String referenceType,
+            Long referenceId
+    ) {
+
+        this.id = id;
+        this.title = title;
+        this.project = project;
+        this.category = category;
+        this.date = date;
+        this.referenceType = referenceType;
+        this.referenceId = referenceId;
     }
 
 
@@ -87,5 +111,27 @@ public class KnowledgeItemResponse {
             String date
     ) {
         this.date = date;
+    }
+
+
+    public String getReferenceType() {
+        return referenceType;
+    }
+
+    public void setReferenceType(
+            String referenceType
+    ) {
+        this.referenceType = referenceType;
+    }
+
+
+    public Long getReferenceId() {
+        return referenceId;
+    }
+
+    public void setReferenceId(
+            Long referenceId
+    ) {
+        this.referenceId = referenceId;
     }
 }
