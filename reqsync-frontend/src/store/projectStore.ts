@@ -159,6 +159,7 @@ interface ProjectState {
   addTask: (task: Omit<Task, 'id'>) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   addBaseline: (baseline: Omit<Baseline, 'createdAt' | 'reqCount' | 'status'>) => void;
+  setApprovals: (approvals: Approval[]) => void;
   approveApproval: (id: string) => void;
   rejectApproval: (id: string) => void;
   addKnowledge: (item: Omit<KnowledgeItem, 'id' | 'date'>) => void;
@@ -803,6 +804,11 @@ export const useProjectStore = create<ProjectState>()(
             status: 'Active'
           };
           return { baselines: [newBaseline, ...updatedBaselines] };
+        }),
+
+      setApprovals: (approvals) =>
+        set({
+          approvals,
         }),
 
       approveApproval: (id) =>
