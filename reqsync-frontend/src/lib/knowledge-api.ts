@@ -6,11 +6,13 @@ export interface KnowledgeItemDto {
   project: string;
   category: string;
   date: string;
+  referenceType?: string;
+  referenceId?: number;
 }
 
-export async function getProjectKnowledge(projectId: number): Promise<KnowledgeItemDto[]> {
+export async function getKnowledgeVault(): Promise<KnowledgeItemDto[]> {
   try {
-    return await apiRequest<KnowledgeItemDto[]>(`/knowledge/project/${projectId}`, { method: 'GET' });
+    return await apiRequest<KnowledgeItemDto[]>('/knowledge', { method: 'GET' });
   } catch (err) {
     // Bubble up error to caller to decide fallback to local store
     throw err;
