@@ -4,9 +4,9 @@ public enum SubmissionStatus {
 
     SUBMITTED,
 
-    QA_IN_PROGRESS,
+    QA_REVIEW,
 
-    CHANGES_REQUESTED,
+    REJECTED,
 
     APPROVED
 }
