@@ -6,6 +6,7 @@
 
     <modelVersion>4.0.0</modelVersion>
 
+
     <!-- ===================================================== -->
     <!-- Spring Boot Parent                                    -->
     <!-- ===================================================== -->
@@ -41,7 +42,6 @@
 
     <properties>
 
-        <!-- Java version -->
         <java.version>21</java.version>
 
     </properties>
@@ -56,6 +56,7 @@
 
         <!-- ================================================= -->
         <!-- Spring Boot Web MVC                               -->
+        <!-- Required for REST Controllers and APIs            -->
         <!-- ================================================= -->
 
         <dependency>
@@ -66,6 +67,7 @@
 
         <!-- ================================================= -->
         <!-- Spring Data JPA                                   -->
+        <!-- Required for DeveloperTask and database access    -->
         <!-- ================================================= -->
 
         <dependency>
@@ -87,6 +89,7 @@
 
         <!-- ================================================= -->
         <!-- Spring Security                                   -->
+        <!-- Required for JWT authentication and authorization -->
         <!-- ================================================= -->
 
         <dependency>
@@ -97,8 +100,7 @@
 
         <!-- ================================================= -->
         <!-- Jackson                                           -->
-        <!-- Required for JSON parsing in GeminiClient and    -->
-        <!-- RequirementExtractionService                    -->
+        <!-- Required for JSON request/response processing      -->
         <!-- ================================================= -->
 
         <dependency>
@@ -106,13 +108,20 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
-        <!-- Jackson 2 Spring Boot support -->
+
+        <!-- ================================================= -->
+        <!-- Jackson 2 Spring Boot Support                     -->
+        <!-- ================================================= -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-jackson2</artifactId>
         </dependency>
+
+
         <!-- ================================================= -->
         <!-- PostgreSQL                                        -->
+        <!-- Required for Auth and Developer databases         -->
         <!-- ================================================= -->
 
         <dependency>
@@ -120,13 +129,22 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+
+
+        <!-- ================================================= -->
+        <!-- Spring Boot REST Client                           -->
+        <!-- Required by existing ReqSync services             -->
+        <!-- ================================================= -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-restclient</artifactId>
         </dependency>
 
+
         <!-- ================================================= -->
-        <!-- H2 Database (Testing)                            -->
+        <!-- H2 Database                                      -->
+        <!-- Used for testing                                 -->
         <!-- ================================================= -->
 
         <dependency>
@@ -146,16 +164,20 @@
             <optional>true</optional>
         </dependency>
 
+
         <!-- ================================================= -->
         <!-- JWT Authentication                                -->
         <!-- ================================================= -->
 
+        <!-- JWT API -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
             <version>0.13.0</version>
         </dependency>
 
+
+        <!-- JWT Implementation -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-impl</artifactId>
@@ -163,12 +185,15 @@
             <scope>runtime</scope>
         </dependency>
 
+
+        <!-- JWT Jackson JSON Support -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-jackson</artifactId>
             <version>0.13.0</version>
             <scope>runtime</scope>
         </dependency>
+
 
         <!-- ================================================= -->
         <!-- Spring Boot DevTools                              -->
@@ -192,7 +217,12 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- PlantUML rendering -->
+
+        <!-- ================================================= -->
+        <!-- PlantUML                                          -->
+        <!-- Required for existing UML functionality           -->
+        <!-- ================================================= -->
+
         <dependency>
             <groupId>net.sourceforge.plantuml</groupId>
             <artifactId>plantuml-lgpl</artifactId>
