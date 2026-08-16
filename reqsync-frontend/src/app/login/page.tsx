@@ -2,12 +2,38 @@
 
 import { useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { useProjectStore } from '@/store/projectStore';
+import { useProjectStore, type AppUser } from '@/store/projectStore';
 import Link from 'next/link';
 import { Sparkles, ArrowRight, Mail, Lock, UserCheck, AlertCircle } from 'lucide-react';
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
+type BackendRole =
+  | 'SYSTEM_ADMIN'
+  | 'CEO'
+  | 'PROJECT_MANAGER'
+  | 'BUSINESS_ANALYST'
+  | 'DEVELOPER'
+  | 'QA_ENGINEER';
+
+interface BackendAuthResponse {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: BackendRole;
+  token: string;
+  message: string;
+}
+
+const BACKEND_ROLE_TO_FRONTEND_ROLE: Record<BackendRole, AppUser['role']> = {
+  SYSTEM_ADMIN: 'System Admin',
+  CEO: 'CEO',
+  PROJECT_MANAGER: 'Project Manager',
+  BUSINESS_ANALYST: 'Business Analyst',
+  DEVELOPER: 'Developer',
+  QA_ENGINEER: 'QA Engineer',
+};
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -20,7 +46,7 @@ export default function LoginPage() {
     () => false
   );
 
-  const login = useProjectStore((state) => state.login);
+  const setAuthenticatedUser = useProjectStore((state) => state.setAuthenticatedUser);
   const router = useRouter();
 
 
@@ -53,20 +79,26 @@ export default function LoginPage() {
         throw new Error('Invalid email or password.');
       }
 
-      const auth = await response.json();
+      const auth = (await response.json()) as BackendAuthResponse;
 
       if (!auth.token) {
         throw new Error('Authentication token was not returned.');
       }
 
+      const role = BACKEND_ROLE_TO_FRONTEND_ROLE[auth.role];
+
+      if (!role) {
+        throw new Error('Unsupported account role.');
+      }
+
       localStorage.setItem('reqsync_token', auth.token);
 
-      const success = login(email, password);
-
-      if (!success) {
-        localStorage.removeItem('reqsync_token');
-        throw new Error('Unable to load frontend user profile.');
-      }
+      setAuthenticatedUser({
+        id: String(auth.id),
+        name: `${auth.firstName} ${auth.lastName}`.trim(),
+        email: auth.email,
+        role,
+      });
 
       router.replace('/dashboard');
     } catch (error) {

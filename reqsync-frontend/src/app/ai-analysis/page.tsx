@@ -9,17 +9,12 @@ import {
   type RequirementCompletenessResponse,
   type RequirementSummaryResponse,
 } from '@/lib/completeness-api';
-import { Sparkles, BrainCircuit, Activity, FileText, CheckCircle2, Users, Zap, AlertTriangle, RotateCw, Plus } from 'lucide-react';
-import {
-  getProjectSrs,
-  generateProjectSrs,
-  SrsDocumentDto,
-} from '@/lib/srs-api';
-import SrsDocumentView from '@/components/srs-document-view';
+import { Sparkles, BrainCircuit, Activity, FileText, CheckCircle2, Users, Zap, AlertTriangle, Printer, RotateCw, Plus } from 'lucide-react';
 
 export default function AiAnalysisPage() {
   const [mounted, setMounted] = useState(false);
 
+  const requirements = useProjectStore((state) => state.requirements);
   const addRequirement = useProjectStore((state) => state.addRequirement);
   const addUserStory = useProjectStore((state) => state.addUserStory);
   const addTask = useProjectStore((state) => state.addTask);
@@ -55,60 +50,8 @@ export default function AiAnalysisPage() {
   } | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
 
-  // Real backend SRS state
-  const [srsDocument, setSrsDocument] = useState<SrsDocumentDto | null>(null);
-  const [srsLoading, setSrsLoading] = useState(false);
-  const [srsGenerating, setSrsGenerating] = useState(false);
-  const [srsError, setSrsError] = useState<string | null>(null);
-
-  // Load the real backend SRS document when the SRS tab opens
-  useEffect(() => {
-    if (!mounted || activeTab !== 'srs') return;
-
-    let cancelled = false;
-
-    const loadSrs = async () => {
-      try {
-        setSrsLoading(true);
-        setSrsError(null);
-
-        const projectId = selectedBackendProjectId ?? 1;
-        const doc = await getProjectSrs(projectId);
-
-        if (cancelled) return;
-
-        setSrsDocument(doc ?? null);
-      } catch (err: any) {
-        if (cancelled) return;
-        setSrsDocument(null);
-        setSrsError(err?.message ?? 'Unable to load SRS from backend.');
-      } finally {
-        if (!cancelled) setSrsLoading(false);
-      }
-    };
-
-    void loadSrs();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mounted, activeTab, selectedBackendProjectId]);
-
-  const handleGenerateSrs = async () => {
-    try {
-      setSrsGenerating(true);
-      setSrsError(null);
-
-      const projectId = selectedBackendProjectId ?? 1;
-      const doc = await generateProjectSrs(projectId);
-
-      setSrsDocument(doc);
-    } catch (err: any) {
-      setSrsError(err?.message ?? 'SRS generation failed.');
-    } finally {
-      setSrsGenerating(false);
-    }
-  };
+  // SRS Template state
+  const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -364,6 +307,15 @@ export default function AiAnalysisPage() {
     }
 
     return { score, reason };
+  };
+
+  // Printable SRS View
+  const handlePrintSRS = () => {
+    setIsPrinting(true);
+    setTimeout(() => {
+      window.print();
+      setIsPrinting(false);
+    }, 500);
   };
 
   return (
@@ -994,58 +946,126 @@ export default function AiAnalysisPage() {
                 <p className="text-xs text-slate-500">Compile all approved requirements into a formal Software Requirements Specification document.</p>
               </div>
 
-              <div className="flex items-center gap-2">
-                {currentUser?.role === 'Business Analyst' && (
-                  <button
-                    onClick={handleGenerateSrs}
-                    disabled={srsGenerating}
-                    className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
-                  >
-                    {srsGenerating ? (
-                      <>
-                        <RotateCw className="w-4 h-4 animate-spin" />
-                        <span>Generating...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        <span>{srsDocument ? 'Regenerate SRS' : 'Generate SRS'}</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
+              <button
+                onClick={handlePrintSRS}
+                className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Export / Print SRS</span>
+              </button>
             </div>
 
-            {srsError && (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>{srsError}</span>
-              </div>
-            )}
+            {/* Simulated SRS Template Container */}
+            <div className="border border-slate-200 p-8 rounded-2xl shadow-xs bg-slate-50 max-h-[60vh] overflow-y-auto print:max-h-none print:bg-white print:p-0 print:border-none">
+              <div className="bg-white border border-slate-200/60 p-8 max-w-3xl mx-auto space-y-12 font-sans text-slate-800 shadow-2xs print:shadow-none print:border-none">
+                
+                {/* Cover Page */}
+                <div className="text-center py-20 space-y-6 border-b border-slate-100">
+                  <span className="text-[10px] font-black tracking-widest uppercase bg-slate-100 text-slate-700 px-3 py-1 rounded">
+                    Software Requirements Specification (SRS)
+                  </span>
+                  <h1 className="text-3xl font-extrabold text-slate-950 tracking-tight mt-4">
+                    {settings.projectName} Specs Doc
+                  </h1>
+                  <p className="text-xs text-slate-500">
+                    Project Reference: {settings.projectCode} | Version: 1.0.0
+                  </p>
+                  <p className="text-[11px] text-slate-400 font-semibold pt-16">
+                    Company: {settings.companyName || ' Apex Financial Technologies LLC'}<br />
+                    Date Compiled: {new Date().toISOString().split('T')[0]}<br />
+                    Prepared By: ReqSync AI Architect
+                  </p>
+                </div>
 
-            {srsLoading ? (
-              <div className="flex items-center gap-2 text-sm text-slate-600 py-10 justify-center">
-                <RotateCw className="w-4 h-4 animate-spin" /> Loading SRS document...
+                {/* Table of Contents */}
+                <div className="space-y-4 pt-6">
+                  <h2 className="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-1 uppercase tracking-wider">
+                    Table of Contents
+                  </h2>
+                  <div className="space-y-1 text-xs text-slate-600 font-semibold">
+                    <div className="flex justify-between border-b border-dotted border-slate-200 pb-0.5">
+                      <span>1. Introduction & Project Scope</span>
+                      <span>Page 2</span>
+                    </div>
+                    <div className="flex justify-between border-b border-dotted border-slate-200 pb-0.5">
+                      <span>2. Functional Requirements Spec</span>
+                      <span>Page 3</span>
+                    </div>
+                    <div className="flex justify-between border-b border-dotted border-slate-200 pb-0.5">
+                      <span>3. Non-Functional & Technical Requirements</span>
+                      <span>Page 4</span>
+                    </div>
+                    <div className="flex justify-between border-b border-dotted border-slate-200 pb-0.5">
+                      <span>4. Traceability Index Matrix</span>
+                      <span>Page 5</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 1. Introduction */}
+                <div className="space-y-3 pt-6">
+                  <h2 className="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-1">
+                    1. Introduction & Project Scope
+                  </h2>
+                  <p className="text-xs text-slate-600 font-normal leading-relaxed">
+                    This document details the Software Requirements Specification (SRS) for the {settings.projectName} system. 
+                    The objective is to establish a verified baseline of specifications, including requirements definitions, 
+                    user stories mapping, and verification test outlines.
+                  </p>
+                  <p className="text-xs text-slate-600 font-normal leading-relaxed">
+                    {settings.description}
+                  </p>
+                </div>
+
+                {/* 2. Functional Specs */}
+                <div className="space-y-4 pt-6">
+                  <h2 className="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-1">
+                    2. Functional Requirements Spec
+                  </h2>
+                  
+                  <div className="space-y-6">
+                    {requirements.filter(r => r.type === 'Functional').map(req => (
+                      <div key={req.id} className="space-y-1.5 pl-3 border-l-2 border-slate-900">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-extrabold text-slate-950">{req.id}: {req.title}</span>
+                          <span className="text-[10px] text-slate-400 font-semibold">Status: {req.status}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-normal font-normal">{req.description}</p>
+                        
+                        <div className="pt-1.5">
+                          <span className="text-[10px] font-bold text-slate-800 block mb-0.5">Acceptance Criteria:</span>
+                          <ul className="list-disc pl-4 text-[10px] text-slate-500 space-y-0.5 font-medium">
+                            {req.acceptanceCriteria.map((ac, acidx) => (
+                              <li key={acidx}>{ac}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Non-Functional specs */}
+                <div className="space-y-4 pt-6">
+                  <h2 className="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-1">
+                    3. Non-Functional & Technical Requirements
+                  </h2>
+                  
+                  <div className="space-y-6">
+                    {requirements.filter(r => r.type !== 'Functional').map(req => (
+                      <div key={req.id} className="space-y-1.5 pl-3 border-l-2 border-slate-400">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-extrabold text-slate-950">{req.id}: {req.title} ({req.type})</span>
+                          <span className="text-[10px] text-slate-400 font-semibold">Status: {req.status}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-normal font-normal">{req.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
               </div>
-            ) : !srsDocument ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <FileText className="w-12 h-12 text-slate-300 mb-3" />
-                <h3 className="text-base font-bold text-slate-700">
-                  No SRS document generated yet
-                </h3>
-                <p className="text-xs text-slate-500 max-w-md mt-1">
-                  Click <span className="font-semibold">Generate SRS</span> to build
-                  a complete Software Requirements Specification from the project
-                  requirements using AI.
-                </p>
-              </div>
-            ) : (
-              <SrsDocumentView
-                document={srsDocument}
-                projectCode={`PRJ-${srsDocument.projectId}`}
-              />
-            )}
+            </div>
           </div>
         )}
 

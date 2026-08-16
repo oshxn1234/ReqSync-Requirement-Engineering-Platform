@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import {
   usePathname,
@@ -8,7 +8,8 @@ import {
 } from 'next/navigation';
 
 import {
-  useProjectStore
+  useProjectStore,
+  type AppUser
 } from '@/store/projectStore';
 
 import Sidebar from './sidebar';
@@ -20,6 +21,34 @@ import {
   ArrowLeft
 } from 'lucide-react';
 
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
+
+type BackendRole =
+  | 'SYSTEM_ADMIN'
+  | 'CEO'
+  | 'PROJECT_MANAGER'
+  | 'BUSINESS_ANALYST'
+  | 'DEVELOPER'
+  | 'QA_ENGINEER';
+
+interface BackendAuthUser {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: BackendRole;
+}
+
+const BACKEND_ROLE_TO_FRONTEND_ROLE: Record<BackendRole, AppUser['role']> = {
+  SYSTEM_ADMIN: 'System Admin',
+  CEO: 'CEO',
+  PROJECT_MANAGER: 'Project Manager',
+  BUSINESS_ANALYST: 'Business Analyst',
+  DEVELOPER: 'Developer',
+  QA_ENGINEER: 'QA Engineer',
+};
 
 const rolePaths:
 Record<string, string[]> = {
@@ -34,8 +63,7 @@ Record<string, string[]> = {
 
 
   '/user-management': [
-    'CEO',
-    'Project Manager'
+    'System Admin'
   ],
 
 
@@ -132,6 +160,12 @@ export default function LayoutWrapper({
     );
 
 
+  const setAuthenticatedUser =
+    useProjectStore(
+      (state) => state.setAuthenticatedUser
+    );
+
+
   const router =
     useRouter();
 
@@ -140,22 +174,98 @@ export default function LayoutWrapper({
     usePathname();
 
 
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+
   const [
-    mounted,
-    setMounted
+    authChecked,
+    setAuthChecked
   ] =
     useState(false);
 
 
   useEffect(
     () => {
+      if (!mounted) {
+        return;
+      }
 
-      setMounted(
-        true
-      );
+      let cancelled = false;
 
+      const restoreSession = async () => {
+        const token =
+          localStorage.getItem('reqsync_token');
+
+        if (!token) {
+          setAuthenticatedUser(null);
+
+          if (!cancelled) {
+            setAuthChecked(true);
+          }
+
+          return;
+        }
+
+        try {
+          const response = await fetch(
+            `${API_BASE}/auth/me`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+              localStorage.removeItem('reqsync_token');
+            }
+
+            throw new Error('Unable to restore authentication session.');
+          }
+
+          const auth =
+            (await response.json()) as BackendAuthUser;
+
+          const role =
+            BACKEND_ROLE_TO_FRONTEND_ROLE[auth.role];
+
+          if (!role) {
+            throw new Error('Unsupported account role.');
+          }
+
+          if (!cancelled) {
+            setAuthenticatedUser({
+              id: String(auth.id),
+              name: `${auth.firstName} ${auth.lastName}`.trim(),
+              email: auth.email,
+              role,
+            });
+          }
+        } catch {
+          if (!cancelled) {
+            setAuthenticatedUser(null);
+          }
+        } finally {
+          if (!cancelled) {
+            setAuthChecked(true);
+          }
+        }
+      };
+
+      void restoreSession();
+
+      return () => {
+        cancelled = true;
+      };
     },
-    []
+    [
+      mounted,
+      setAuthenticatedUser
+    ]
   );
 
 
@@ -169,7 +279,6 @@ export default function LayoutWrapper({
     () => {
 
       if (!mounted) {
-
         return;
       }
 
@@ -204,12 +313,13 @@ export default function LayoutWrapper({
       currentUser,
       pathname,
       mounted,
+      authChecked,
       router
     ]
   );
 
 
-  if (!mounted) {
+  if (!mounted || !authChecked) {
 
     return (
 

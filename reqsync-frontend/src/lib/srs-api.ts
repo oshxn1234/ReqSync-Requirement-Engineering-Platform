@@ -1,66 +1,200 @@
-import { apiRequest } from '@/lib/api-client';
+import {
+  apiRequest
+} from '@/lib/api-client';
+
+
+/* =========================================================
+   SRS STATUS
+   ========================================================= */
+
+export type SrsStatus =
+  | 'GENERATED'
+  | 'DRAFT'
+  | 'REVIEWED'
+  | 'APPROVED';
+
+
+/* =========================================================
+   SRS SECTION
+   ========================================================= */
 
 export interface SrsSection {
+
   title: string;
+
   content: string;
+
   order: number;
 }
 
-export interface SrsDocumentDto {
+
+/* =========================================================
+   SRS RESPONSE
+   ========================================================= */
+
+export interface SrsGenerationResponse {
+
   id: number;
+
   projectId: number;
+
   projectName: string;
+
   version: number;
+
   title: string;
-  status: 'GENERATED' | 'DRAFT' | 'REVIEWED' | 'APPROVED';
+
+  status: SrsStatus;
+
   sections: SrsSection[];
+
   markdownContent: string;
+
   createdAt: string;
+
   updatedAt: string;
 }
 
-export async function getProjectSrs(
-  projectId: number
-): Promise<SrsDocumentDto | undefined> {
-  return apiRequest<SrsDocumentDto>(`/projects/${projectId}/srs`, {
-    method: 'GET',
-  });
+
+/* =========================================================
+   UPDATE REQUEST
+   ========================================================= */
+
+export interface SrsUpdateRequest {
+
+  title?: string;
+
+  content?: string;
+
+  status?: SrsStatus;
 }
 
-export async function getProjectSrsVersions(
+
+/* =========================================================
+   GENERATE SRS
+
+   POST /api/projects/{projectId}/srs/generate
+   ========================================================= */
+
+export async function generateSrs(
   projectId: number
-): Promise<SrsDocumentDto[]> {
-  return apiRequest<SrsDocumentDto[]>(`/projects/${projectId}/srs/versions`, {
-    method: 'GET',
-  });
+): Promise<SrsGenerationResponse> {
+
+  return apiRequest<
+    SrsGenerationResponse
+  >(
+    `/projects/${projectId}/srs/generate`,
+    {
+      method: 'POST',
+    }
+  );
 }
+
+
+/* =========================================================
+   GET LATEST PROJECT SRS
+
+   GET /api/projects/{projectId}/srs
+   ========================================================= */
+
+export async function getProjectSrs(
+  projectId: number
+): Promise<SrsGenerationResponse | null> {
+
+  return apiRequest<
+    SrsGenerationResponse | null
+  >(
+    `/projects/${projectId}/srs`,
+    {
+      method: 'GET',
+    }
+  );
+}
+
+
+/* =========================================================
+   GET ALL PROJECT SRS VERSIONS
+
+   GET /api/projects/{projectId}/srs/versions
+   ========================================================= */
+
+export async function getSrsVersions(
+  projectId: number
+): Promise<SrsGenerationResponse[]> {
+
+  return apiRequest<
+    SrsGenerationResponse[]
+  >(
+    `/projects/${projectId}/srs/versions`,
+    {
+      method: 'GET',
+    }
+  );
+}
+
+
+/* =========================================================
+   GET SINGLE SRS VERSION
+
+   GET /api/srs/{srsId}
+   ========================================================= */
 
 export async function getSrsById(
   srsId: number
-): Promise<SrsDocumentDto> {
-  return apiRequest<SrsDocumentDto>(`/srs/${srsId}`, {
-    method: 'GET',
-  });
+): Promise<SrsGenerationResponse> {
+
+  return apiRequest<
+    SrsGenerationResponse
+  >(
+    `/srs/${srsId}`,
+    {
+      method: 'GET',
+    }
+  );
 }
 
-export async function generateProjectSrs(
-  projectId: number
-): Promise<SrsDocumentDto> {
-  return apiRequest<SrsDocumentDto>(`/projects/${projectId}/srs/generate`, {
-    method: 'POST',
-  });
-}
+
+/* =========================================================
+   UPDATE SRS
+
+   PUT /api/srs/{srsId}
+   ========================================================= */
 
 export async function updateSrs(
   srsId: number,
-  payload: { title?: string; content?: string; status?: string }
-): Promise<SrsDocumentDto> {
-  return apiRequest<SrsDocumentDto>(`/srs/${srsId}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
+  request: SrsUpdateRequest
+): Promise<SrsGenerationResponse> {
+
+  return apiRequest<
+    SrsGenerationResponse
+  >(
+    `/srs/${srsId}`,
+    {
+      method: 'PUT',
+
+      body:
+        JSON.stringify(
+          request
+        ),
+    }
+  );
 }
 
-export async function deleteSrs(srsId: number): Promise<void> {
-  return apiRequest(`/srs/${srsId}`, { method: 'DELETE' });
+
+/* =========================================================
+   DELETE SRS
+
+   DELETE /api/srs/{srsId}
+   ========================================================= */
+
+export async function deleteSrs(
+  srsId: number
+): Promise<void> {
+
+  return apiRequest<void>(
+    `/srs/${srsId}`,
+    {
+      method: 'DELETE',
+    }
+  );
 }

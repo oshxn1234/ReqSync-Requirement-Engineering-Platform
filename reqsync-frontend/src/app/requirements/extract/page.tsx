@@ -12,16 +12,23 @@ import Link from 'next/link';
 
 import {
   AlertCircle,
+  ArrowRight,
   CheckCircle2,
   FileText,
   FolderKanban,
   Loader2,
   RefreshCcw,
+  ShieldAlert,
   Sparkles
 } from 'lucide-react';
 
 import {
-  getAllProjects
+  useRouter
+} from 'next/navigation';
+
+import {
+  getAllProjects,
+  type ProjectResponse
 } from '@/lib/project-api';
 
 import {
@@ -32,15 +39,44 @@ import {
 } from '@/lib/requirement-api';
 
 import {
+  getProjectMembers
+} from '@/lib/team-api';
+
+import {
   useBackendProjectStore
 } from '@/store/backendProjectStore';
+
+import {
+  useProjectStore
+} from '@/store/projectStore';
 
 
 export default function RequirementExtractionPage() {
 
-  /*
-   * Project state.
-   */
+  const router =
+    useRouter();
+
+
+  /* =========================================================
+     AUTHENTICATED USER
+     ========================================================= */
+
+  const currentUser =
+    useProjectStore(
+      (state) =>
+        state.currentUser
+    );
+
+
+  const isBusinessAnalyst =
+    currentUser?.role ===
+    'Business Analyst';
+
+
+  /* =========================================================
+     PROJECT STORE
+     ========================================================= */
+
   const projects =
     useBackendProjectStore(
       (state) =>
@@ -69,9 +105,23 @@ export default function RequirementExtractionPage() {
     );
 
 
-  /*
-   * Requirement extraction states.
-   */
+  /* =========================================================
+     PROJECTS AVAILABLE TO THIS BA
+     ========================================================= */
+
+  const [
+    assignedProjects,
+    setAssignedProjects
+  ] =
+    useState<ProjectResponse[]>(
+      []
+    );
+
+
+  /* =========================================================
+     EXTRACTION STATE
+     ========================================================= */
+
   const [
     documentContent,
     setDocumentContent
@@ -111,6 +161,13 @@ export default function RequirementExtractionPage() {
 
 
   const [
+    filteringProjects,
+    setFilteringProjects
+  ] =
+    useState(false);
+
+
+  const [
     error,
     setError
   ] =
@@ -119,38 +176,51 @@ export default function RequirementExtractionPage() {
     );
 
 
-  /*
-   * Get full selected project object.
-   */
+  const [
+    success,
+    setSuccess
+  ] =
+    useState<string | null>(
+      null
+    );
+
+
+  /* =========================================================
+     SELECTED PROJECT
+     ========================================================= */
+
   const selectedProject =
     useMemo(
       () =>
-        projects.find(
+        assignedProjects.find(
           (project) =>
             project.id ===
             selectedProjectId
         ) ?? null,
+
       [
-        projects,
+        assignedProjects,
         selectedProjectId
       ]
     );
 
 
-  /*
-   * Load real projects from backend.
-   */
+  /* =========================================================
+     LOAD ALL PROJECTS
+     ========================================================= */
+
   const loadProjects =
     useCallback(
       async () => {
-
-        setError(null);
-
 
         try {
 
           setProjectsLoading(
             true
+          );
+
+          setError(
+            null
           );
 
 
@@ -177,23 +247,271 @@ export default function RequirementExtractionPage() {
           );
         }
       },
-      [setProjects]
+
+      [
+        setProjects
+      ]
     );
 
+
+  /* =========================================================
+     FILTER PROJECTS ASSIGNED TO CURRENT BA
+
+     We use the existing project-members endpoint and
+     compare the backend member userId with currentUser.id.
+     ========================================================= */
+
+  const loadAssignedProjects =
+    useCallback(
+      async () => {
+
+        if (
+          !isBusinessAnalyst ||
+          !currentUser
+        ) {
+
+          setAssignedProjects(
+            []
+          );
+
+          return;
+        }
+
+
+        try {
+
+          setFilteringProjects(
+            true
+          );
+
+          setError(
+            null
+          );
+
+
+          const currentUserId =
+            Number(
+              currentUser.id
+            );
+
+
+          if (
+            Number.isNaN(
+              currentUserId
+            )
+          ) {
+
+            setAssignedProjects(
+              []
+            );
+
+            setError(
+              'Unable to identify the authenticated Business Analyst.'
+            );
+
+            return;
+          }
+
+
+          const projectChecks =
+            await Promise.allSettled(
+              projects.map(
+                async (
+                  project
+                ) => {
+
+                  const members =
+                    await getProjectMembers(
+                      project.id
+                    );
+
+
+                  const assigned =
+                    members.some(
+                      (member) =>
+                        member.active &&
+                        member.userId ===
+                        currentUserId &&
+                        member.role ===
+                        'BUSINESS_ANALYST'
+                    );
+
+
+                  return {
+                    project,
+                    assigned
+                  };
+                }
+              )
+            );
+
+
+          const availableProjects =
+            projectChecks
+
+              .filter(
+                (
+                  result
+                ): result is PromiseFulfilledResult<{
+                  project: ProjectResponse;
+                  assigned: boolean;
+                }> =>
+                  result.status ===
+                  'fulfilled'
+              )
+
+              .filter(
+                (result) =>
+                  result.value.assigned
+              )
+
+              .map(
+                (result) =>
+                  result.value.project
+              );
+
+
+          setAssignedProjects(
+            availableProjects
+          );
+
+
+          /*
+           * If selected project is not available
+           * to this BA, clear the selection.
+           */
+          if (
+            selectedProjectId !==
+              null &&
+            !availableProjects.some(
+              (project) =>
+                project.id ===
+                selectedProjectId
+            )
+          ) {
+
+            selectProject(
+              null
+            );
+
+            setResult(
+              null
+            );
+          }
+
+        } catch (error) {
+
+          setAssignedProjects(
+            []
+          );
+
+
+          setError(
+            error instanceof Error
+              ? error.message
+              : 'Unable to determine Business Analyst project assignments.'
+          );
+
+        } finally {
+
+          setFilteringProjects(
+            false
+          );
+        }
+      },
+
+      [
+        currentUser,
+        isBusinessAnalyst,
+        projects,
+        selectedProjectId,
+        selectProject
+      ]
+    );
+
+
+  /* =========================================================
+     INITIAL PROJECT LOAD
+     ========================================================= */
 
   useEffect(
     () => {
 
+      if (
+        !isBusinessAnalyst
+      ) {
+
+        return;
+      }
+
+
       void loadProjects();
 
     },
-    [loadProjects]
+    [
+      isBusinessAnalyst,
+      loadProjects
+    ]
   );
 
 
-  /*
-   * POST /api/requirements/extract
-   */
+  /* =========================================================
+     FILTER BA PROJECTS AFTER PROJECTS LOAD
+     ========================================================= */
+
+  useEffect(
+    () => {
+
+      if (
+        !isBusinessAnalyst ||
+        projectsLoading
+      ) {
+
+        return;
+      }
+
+
+      void loadAssignedProjects();
+
+    },
+    [
+      isBusinessAnalyst,
+      projectsLoading,
+      loadAssignedProjects
+    ]
+  );
+
+
+  /* =========================================================
+     LOAD LATEST EXTRACTION WHEN PROJECT CHANGES
+     ========================================================= */
+
+  useEffect(
+    () => {
+
+      setResult(
+        null
+      );
+
+      setSuccess(
+        null
+      );
+
+      setError(
+        null
+      );
+
+    },
+    [
+      selectedProjectId
+    ]
+  );
+
+
+  /* =========================================================
+     EXTRACT REQUIREMENTS
+     ========================================================= */
+
   const handleExtract =
     async (
       event:
@@ -203,16 +521,62 @@ export default function RequirementExtractionPage() {
       event.preventDefault();
 
 
-      setError(null);
-      setResult(null);
+      setError(
+        null
+      );
+
+      setSuccess(
+        null
+      );
+
+      setResult(
+        null
+      );
 
 
       if (
-        selectedProjectId === null
+        !isBusinessAnalyst
+      ) {
+
+        setError(
+          'Only Business Analysts can extract requirements.'
+        );
+
+        return;
+      }
+
+
+      if (
+        selectedProjectId ===
+        null
       ) {
 
         setError(
           'Please select a project first.'
+        );
+
+        return;
+      }
+
+
+      /*
+       * Additional protection against manually
+       * selecting a project outside the BA's assignment.
+       */
+      const projectIsAssigned =
+        assignedProjects.some(
+          (project) =>
+            project.id ===
+            selectedProjectId
+        );
+
+
+      if (
+        !projectIsAssigned
+      ) {
+
+        setError(
+          'You are not assigned as a Business Analyst for this project.'
         );
 
         return;
@@ -240,6 +604,7 @@ export default function RequirementExtractionPage() {
 
         const response =
           await extractRequirements({
+
             projectId:
               selectedProjectId,
 
@@ -251,6 +616,17 @@ export default function RequirementExtractionPage() {
         setResult(
           response
         );
+
+
+        if (
+          response.status ===
+          'COMPLETED'
+        ) {
+
+          setSuccess(
+            `${response.requirementCount} requirements were extracted successfully.`
+          );
+        }
 
       } catch (error) {
 
@@ -269,17 +645,25 @@ export default function RequirementExtractionPage() {
     };
 
 
-  /*
-   * GET latest extraction.
-   */
+  /* =========================================================
+     LOAD LATEST EXTRACTION
+     ========================================================= */
+
   const handleLoadLatest =
     async () => {
 
-      setError(null);
+      setError(
+        null
+      );
+
+      setSuccess(
+        null
+      );
 
 
       if (
-        selectedProjectId === null
+        selectedProjectId ===
+        null
       ) {
 
         setError(
@@ -309,6 +693,11 @@ export default function RequirementExtractionPage() {
 
       } catch (error) {
 
+        setResult(
+          null
+        );
+
+
         setError(
           error instanceof Error
             ? error.message
@@ -323,6 +712,10 @@ export default function RequirementExtractionPage() {
       }
     };
 
+
+  /* =========================================================
+     FORMAT ENUM VALUE
+     ========================================================= */
 
   const formatEnum =
     (
@@ -352,6 +745,10 @@ export default function RequirementExtractionPage() {
     };
 
 
+  /* =========================================================
+     CONFIDENCE SCORE
+     ========================================================= */
+
   const confidenceText =
     (
       requirement:
@@ -379,15 +776,81 @@ export default function RequirementExtractionPage() {
           : requirement.confidenceScore;
 
 
-      return `${Math.round(score)}%`;
+      return `${Math.round(
+        score
+      )}%`;
     };
 
+
+  /* =========================================================
+     ACCESS CONTROL
+     ========================================================= */
+
+  if (
+    !isBusinessAnalyst
+  ) {
+
+    return (
+
+      <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-md mx-auto text-center space-y-6">
+
+        <div className="p-4 bg-rose-50 rounded-full text-rose-600">
+
+          <ShieldAlert className="w-12 h-12" />
+
+        </div>
+
+
+        <div className="space-y-2">
+
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+
+            Access Denied
+
+          </h2>
+
+
+          <p className="text-slate-500 text-sm">
+
+            Requirement extraction can only be performed by the Business Analyst assigned to the project.
+
+          </p>
+
+        </div>
+
+
+        <button
+          type="button"
+          onClick={
+            () =>
+              router.replace(
+                '/dashboard'
+              )
+          }
+          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all"
+        >
+
+          Return to Dashboard
+
+        </button>
+
+      </div>
+    );
+  }
+
+
+  /* =========================================================
+     UI
+     ========================================================= */
 
   return (
 
     <div className="max-w-7xl mx-auto space-y-6">
 
-      {/* PAGE HEADER */}
+      {/* =====================================================
+          PAGE HEADER
+          ===================================================== */}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
 
         <div className="flex items-center gap-3">
@@ -403,14 +866,14 @@ export default function RequirementExtractionPage() {
 
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
 
-              AI Requirement Extraction
+              Requirement Extraction
 
             </h1>
 
 
             <p className="text-sm text-slate-500 mt-1">
 
-              Convert meeting notes into structured software requirements using the backend AI service.
+              Convert stakeholder discussions, meeting notes and project information into structured software requirements.
 
             </p>
 
@@ -427,9 +890,10 @@ export default function RequirementExtractionPage() {
           }
           disabled={
             latestLoading ||
-            selectedProjectId === null
+            selectedProjectId ===
+              null
           }
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
 
           {latestLoading ? (
@@ -442,7 +906,6 @@ export default function RequirementExtractionPage() {
 
           )}
 
-
           Load Latest Extraction
 
         </button>
@@ -450,7 +913,54 @@ export default function RequirementExtractionPage() {
       </div>
 
 
-      {/* ERROR */}
+      {/* =====================================================
+          SUCCESS
+          ===================================================== */}
+
+      {success && (
+
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700">
+
+          <CheckCircle2 className="w-5 h-5 shrink-0" />
+
+
+          <div className="flex-1">
+
+            <p className="text-sm font-bold">
+
+              Extraction Completed
+
+            </p>
+
+
+            <p className="text-xs mt-1">
+
+              {success}
+
+            </p>
+
+          </div>
+
+
+          <Link
+            href="/requirements"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"
+          >
+
+            View Requirements
+
+            <ArrowRight className="w-4 h-4" />
+
+          </Link>
+
+        </div>
+      )}
+
+
+      {/* =====================================================
+          ERROR
+          ===================================================== */}
+
       {error && (
 
         <div className="flex items-start gap-3 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700">
@@ -479,42 +989,56 @@ export default function RequirementExtractionPage() {
       )}
 
 
-      {/* NO PROJECT */}
+      {/* =====================================================
+          NO ASSIGNED PROJECTS
+          ===================================================== */}
+
       {!projectsLoading &&
-        projects.length === 0 && (
+        !filteringProjects &&
+        assignedProjects.length ===
+          0 && (
 
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
 
-          <FolderKanban className="w-5 h-5" />
+          <FolderKanban className="w-5 h-5 shrink-0" />
 
 
-          <p className="text-sm">
+          <div>
 
-            No projects exist yet.{' '}
+            <p className="text-sm font-bold">
 
-            <Link
-              href="/projects"
-              className="font-bold underline"
-            >
+              No assigned projects
 
-              Create a project first.
+            </p>
 
-            </Link>
 
-          </p>
+            <p className="text-xs mt-1">
+
+              You are not currently assigned as a Business Analyst to any project. A Project Manager must add you to a project team before requirement extraction can begin.
+
+            </p>
+
+          </div>
 
         </div>
       )}
 
 
+      {/* =====================================================
+          MAIN GRID
+          ===================================================== */}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* INPUT SIDE */}
+        {/* ===================================================
+            EXTRACTION INPUT
+            =================================================== */}
+
         <form
           onSubmit={
             handleExtract
           }
-          className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-5"
+          className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-5 self-start"
         >
 
           <div>
@@ -528,14 +1052,17 @@ export default function RequirementExtractionPage() {
 
             <p className="text-xs text-slate-500 mt-1">
 
-              Select a backend project and paste your source notes.
+              Select one of your assigned projects and provide stakeholder or meeting information.
 
             </p>
 
           </div>
 
 
-          {/* PROJECT SELECT */}
+          {/* =================================================
+              PROJECT SELECT
+              ================================================= */}
+
           <div>
 
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
@@ -545,11 +1072,19 @@ export default function RequirementExtractionPage() {
             </label>
 
 
-            {projectsLoading ? (
+            {projectsLoading ||
+            filteringProjects ? (
 
-              <div className="h-10 flex items-center">
+              <div className="h-11 px-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50">
 
-                <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+
+
+                <span className="text-xs text-slate-500">
+
+                  Loading assigned projects...
+
+                </span>
 
               </div>
 
@@ -569,34 +1104,43 @@ export default function RequirementExtractionPage() {
 
                     selectProject(
                       value
-                        ? Number(value)
+                        ? Number(
+                            value
+                          )
                         : null
                     );
                   }
                 }
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
+                disabled={
+                  assignedProjects.length ===
+                  0
+                }
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-900 focus:outline-none focus:border-blue-500 disabled:opacity-60"
               >
 
-                {projects.length ===
-                  0 && (
+                <option value="">
 
-                  <option value="">
+                  Select assigned project
 
-                    No projects available
-
-                  </option>
-                )}
+                </option>
 
 
-                {projects.map(
+                {assignedProjects.map(
                   (project) => (
 
                     <option
-                      key={project.id}
-                      value={project.id}
+                      key={
+                        project.id
+                      }
+                      value={
+                        project.id
+                      }
                     >
 
-                      #{project.id} - {project.name}
+                      Project #
+                      {project.projectNumber}
+                      {' - '}
+                      {project.name}
 
                     </option>
                   )
@@ -608,52 +1152,84 @@ export default function RequirementExtractionPage() {
           </div>
 
 
-          {/* SELECTED PROJECT */}
+          {/* =================================================
+              SELECTED PROJECT
+              ================================================= */}
+
           {selectedProject && (
 
-            <div className="p-3 rounded-xl bg-blue-50 border border-blue-100">
+            <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
 
-              <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold">
+              <div className="flex items-start gap-3">
 
-                Selected Project
-
-              </p>
+                <FolderKanban className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
 
 
-              <p className="text-sm font-extrabold text-blue-900 mt-1">
+                <div>
 
-                {selectedProject.name}
+                  <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold">
 
-              </p>
+                    Selected Project
 
-
-              <p className="text-xs text-blue-700 mt-1">
-
-                Backend ID: {selectedProject.id}
-
-              </p>
+                  </p>
 
 
-              <p className="text-xs text-blue-700">
+                  <p className="text-sm font-extrabold text-blue-900 mt-1">
 
-                Status:{' '}
+                    {selectedProject.name}
 
-                {formatEnum(
-                  selectedProject.status
-                )}
+                  </p>
 
-              </p>
+
+                  <div className="space-y-1 mt-2">
+
+                    <p className="text-xs text-blue-700">
+
+                      Project #
+                      {selectedProject.projectNumber}
+
+                    </p>
+
+
+                    <p className="text-xs text-blue-700">
+
+                      Status:{' '}
+
+                      {formatEnum(
+                        selectedProject.status
+                      )}
+
+                    </p>
+
+
+                    <p className="text-xs text-blue-700">
+
+                      Project Manager:{' '}
+
+                      {selectedProject.projectManagerName ||
+                        'Not assigned'}
+
+                    </p>
+
+                  </div>
+
+                </div>
+
+              </div>
 
             </div>
           )}
 
 
-          {/* DOCUMENT */}
+          {/* =================================================
+              DOCUMENT CONTENT
+              ================================================= */}
+
           <div>
 
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
 
-              Meeting Notes / Document Content
+              Stakeholder / Meeting Information
 
             </label>
 
@@ -669,22 +1245,60 @@ export default function RequirementExtractionPage() {
                     event.target.value
                   )
               }
-              placeholder="Example: Customers can register using their name, email and password. A customer can own one or more bank accounts..."
-              className="w-full px-3 py-3 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-900 resize-y focus:outline-none focus:border-blue-500 focus:bg-white"
+              disabled={
+                selectedProjectId ===
+                  null
+              }
+              placeholder="Example:
+
+Stakeholders discussed the need for employees to securely log in using their work email and password.
+
+The System Administrator should be able to register employees and assign their system roles.
+
+The CEO should be able to create projects and assign a Project Manager.
+
+Business Analysts should review and approve extracted requirements before they are used for SRS, user story and UML generation.
+
+The platform should respond to normal user actions within 2 seconds."
+              className="w-full px-3 py-3 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-900 resize-y focus:outline-none focus:border-blue-500 focus:bg-white disabled:opacity-60 disabled:cursor-not-allowed"
             />
+
+
+            <div className="flex justify-between mt-2">
+
+              <p className="text-[10px] text-slate-400">
+
+                Paste stakeholder discussions, meeting notes, transcripts, emails or other requirement source material.
+
+              </p>
+
+
+              <p className="text-[10px] text-slate-400 shrink-0 ml-3">
+
+                {documentContent.length}
+                {' '}
+                characters
+
+              </p>
+
+            </div>
 
           </div>
 
 
-          {/* EXTRACT BUTTON */}
+          {/* =================================================
+              EXTRACTION BUTTON
+              ================================================= */}
+
           <button
             type="submit"
             disabled={
               loading ||
               selectedProjectId ===
-                null
+                null ||
+              !documentContent.trim()
             }
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white text-sm font-bold"
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold"
           >
 
             {loading ? (
@@ -710,7 +1324,10 @@ export default function RequirementExtractionPage() {
         </form>
 
 
-        {/* RESULTS SIDE */}
+        {/* ===================================================
+            RESULT SIDE
+            =================================================== */}
+
         <div className="lg:col-span-2 space-y-5">
 
           {!result ? (
@@ -733,9 +1350,27 @@ export default function RequirementExtractionPage() {
 
               <p className="text-sm text-slate-500 mt-2 max-w-md">
 
-                Select a project, enter meeting notes, and click Extract Requirements.
+                Select one of your assigned projects, enter stakeholder or meeting information, and run requirement extraction.
 
               </p>
+
+
+              <div className="mt-5 max-w-md rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+
+                <p className="text-xs font-bold text-indigo-800">
+
+                  What happens next?
+
+                </p>
+
+
+                <p className="text-[11px] text-indigo-700 mt-1 leading-relaxed">
+
+                  Extracted requirements are stored as project requirements and can then be reviewed in the Requirements workspace.
+
+                </p>
+
+              </div>
 
             </div>
 
@@ -743,7 +1378,10 @@ export default function RequirementExtractionPage() {
 
             <>
 
-              {/* RESULT SUMMARY */}
+              {/* =============================================
+                  RESULT SUMMARY
+                  ============================================= */}
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
                 <div className="p-5 bg-white border border-slate-200 rounded-2xl">
@@ -783,6 +1421,22 @@ export default function RequirementExtractionPage() {
                     )}
 
 
+                    {result.status ===
+                      'PROCESSING' && (
+
+                      <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+
+                    )}
+
+
+                    {result.status ===
+                      'FAILED' && (
+
+                      <AlertCircle className="w-5 h-5 text-rose-600" />
+
+                    )}
+
+
                     <p className="text-lg font-black text-slate-900">
 
                       {formatEnum(
@@ -816,26 +1470,55 @@ export default function RequirementExtractionPage() {
               </div>
 
 
-              {/* RESULT TABLE */}
+              {/* =============================================
+                  RESULT TABLE
+                  ============================================= */}
+
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
 
                 <div className="p-5 border-b border-slate-100">
 
-                  <h2 className="font-extrabold text-slate-900">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 
-                    Extracted Requirements
+                    <div>
 
-                  </h2>
+                      <h2 className="font-extrabold text-slate-900">
+
+                        Extracted Requirements
+
+                      </h2>
 
 
-                  {result.message && (
+                      {result.message && (
 
-                    <p className="text-xs text-slate-500 mt-1">
+                        <p className="text-xs text-slate-500 mt-1">
 
-                      {result.message}
+                          {result.message}
 
-                    </p>
-                  )}
+                        </p>
+
+                      )}
+
+                    </div>
+
+
+                    {result.status ===
+                      'COMPLETED' && (
+
+                      <Link
+                        href="/requirements"
+                        className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+                      >
+
+                        Open Requirements
+
+                        <ArrowRight className="w-4 h-4" />
+
+                      </Link>
+
+                    )}
+
+                  </div>
 
                 </div>
 
@@ -938,27 +1621,65 @@ export default function RequirementExtractionPage() {
                               </td>
 
 
-                              <td className="px-4 py-4 align-top text-xs text-slate-600">
+                              <td className="px-4 py-4 align-top">
 
-                                {formatEnum(
-                                  requirement.type
-                                )}
+                                <span className="inline-flex px-2 py-1 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-bold text-blue-700">
 
-                              </td>
+                                  {formatEnum(
+                                    requirement.type
+                                  )}
 
-
-                              <td className="px-4 py-4 align-top text-xs font-bold text-slate-700">
-
-                                {formatEnum(
-                                  requirement.priority
-                                )}
+                                </span>
 
                               </td>
 
 
                               <td className="px-4 py-4 align-top">
 
-                                <span className="inline-flex px-2 py-1 rounded-full bg-slate-100 text-[10px] font-bold text-slate-700">
+                                <span
+                                  className={
+                                    `inline-flex px-2 py-1 rounded-full text-[10px] font-bold ${
+                                      requirement.priority ===
+                                      'CRITICAL'
+                                        ? 'bg-rose-50 text-rose-700'
+                                        : requirement.priority ===
+                                          'HIGH'
+                                          ? 'bg-orange-50 text-orange-700'
+                                          : requirement.priority ===
+                                            'MEDIUM'
+                                            ? 'bg-amber-50 text-amber-700'
+                                            : 'bg-slate-100 text-slate-600'
+                                    }`
+                                  }
+                                >
+
+                                  {formatEnum(
+                                    requirement.priority
+                                  )}
+
+                                </span>
+
+                              </td>
+
+
+                              <td className="px-4 py-4 align-top">
+
+                                <span
+                                  className={
+                                    `inline-flex px-2 py-1 rounded-full text-[10px] font-bold ${
+                                      requirement.status ===
+                                      'APPROVED'
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : requirement.status ===
+                                          'REVIEW'
+                                          ? 'bg-amber-50 text-amber-700'
+                                          : requirement.status ===
+                                            'REJECTED'
+                                            ? 'bg-rose-50 text-rose-700'
+                                            : 'bg-slate-100 text-slate-700'
+                                    }`
+                                  }
+                                >
 
                                   {formatEnum(
                                     requirement.status

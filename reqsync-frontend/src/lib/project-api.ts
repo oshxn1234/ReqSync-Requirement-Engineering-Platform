@@ -26,16 +26,31 @@ export interface ProjectUpdateRequest {
 
 export interface ProjectResponse {
   id: number;
+
+  businessId: number;
+
+  projectNumber: number;
+
   name: string;
+
   description: string | null;
+
   status: ProjectStatus;
+
+  projectManagerId: number | null;
+
+  projectManagerName: string | null;
+
   createdAt: string;
+
   updatedAt: string;
 }
 
 
 /*
  * POST /api/projects
+ *
+ * CEO only
  */
 export async function createProject(
   request: ProjectCreateRequest
@@ -45,7 +60,10 @@ export async function createProject(
     '/projects',
     {
       method: 'POST',
-      body: JSON.stringify(request),
+
+      body: JSON.stringify(
+        request
+      ),
     }
   );
 }
@@ -100,6 +118,8 @@ export async function getProjectsByStatus(
 
 /*
  * PUT /api/projects/{projectId}
+ *
+ * CEO only
  */
 export async function updateProject(
   projectId: number,
@@ -110,7 +130,10 @@ export async function updateProject(
     `/projects/${projectId}`,
     {
       method: 'PUT',
-      body: JSON.stringify(request),
+
+      body: JSON.stringify(
+        request
+      ),
     }
   );
 }
@@ -118,6 +141,8 @@ export async function updateProject(
 
 /*
  * DELETE /api/projects/{projectId}
+ *
+ * CEO only
  */
 export async function deleteProject(
   projectId: number
@@ -127,6 +152,26 @@ export async function deleteProject(
     `/projects/${projectId}`,
     {
       method: 'DELETE',
+    }
+  );
+}
+
+
+/*
+ * PUT
+ * /api/projects/{projectId}/project-manager/{managerId}
+ *
+ * CEO only
+ */
+export async function assignProjectManager(
+  projectId: number,
+  managerId: number
+): Promise<ProjectResponse> {
+
+  return apiRequest<ProjectResponse>(
+    `/projects/${projectId}/project-manager/${managerId}`,
+    {
+      method: 'PUT',
     }
   );
 }

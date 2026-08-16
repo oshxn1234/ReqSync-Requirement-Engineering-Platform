@@ -46,15 +46,14 @@ export async function apiRequest<T>(
 
 
   /*
-   * Attach the JWT stored at login time so
-   * authenticated backend endpoints can be reached.
+   * Automatically attach JWT for protected requests.
    */
   if (
     typeof window !== 'undefined' &&
     !headers.has('Authorization')
   ) {
     const token =
-      window.localStorage.getItem('reqsync_token');
+      localStorage.getItem('reqsync_token');
 
     if (token) {
       headers.set(

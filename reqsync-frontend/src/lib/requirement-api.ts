@@ -3,6 +3,10 @@ import {
 } from '@/lib/api-client';
 
 
+/* =========================================================
+   ENUM TYPES
+   ========================================================= */
+
 export type ExtractionStatus =
   | 'PROCESSING'
   | 'COMPLETED'
@@ -32,13 +36,24 @@ export type RequirementStatus =
   | 'REJECTED';
 
 
+/* =========================================================
+   REQUEST DTO
+   ========================================================= */
+
 export interface RequirementExtractionRequest {
+
   projectId: number;
+
   documentContent: string;
 }
 
 
+/* =========================================================
+   REQUIREMENT RESPONSE DTO
+   ========================================================= */
+
 export interface ExtractedRequirement {
+
   id: number;
 
   code: string;
@@ -53,11 +68,17 @@ export interface ExtractedRequirement {
 
   status: RequirementStatus;
 
-  confidenceScore: number | null;
+  confidenceScore:
+    number | null;
 }
 
 
+/* =========================================================
+   EXTRACTION RESPONSE DTO
+   ========================================================= */
+
 export interface RequirementExtractionResponse {
+
   extractionId: number;
 
   projectId: number;
@@ -66,42 +87,75 @@ export interface RequirementExtractionResponse {
 
   requirementCount: number;
 
-  requirements: ExtractedRequirement[];
+  requirements:
+    ExtractedRequirement[];
 
-  message: string | null;
+  message:
+    string | null;
 
   createdAt: string;
 }
 
 
-/*
- * POST /api/requirements/extract
- */
+/* =========================================================
+   EXTRACT REQUIREMENTS
+   POST /api/requirements/extract
+   ========================================================= */
+
 export async function extractRequirements(
-  request: RequirementExtractionRequest
+  request:
+    RequirementExtractionRequest
 ): Promise<RequirementExtractionResponse> {
 
-  return apiRequest<RequirementExtractionResponse>(
+  return apiRequest<
+    RequirementExtractionResponse
+  >(
     '/requirements/extract',
     {
       method: 'POST',
-      body: JSON.stringify(request),
+
+      body:
+        JSON.stringify(
+          request
+        ),
     }
   );
 }
 
 
-/*
- * GET /api/requirements/project/{projectId}/latest
- */
+/* =========================================================
+   GET LATEST EXTRACTION
+   GET /api/requirements/project/{projectId}/latest
+   ========================================================= */
+
 export async function getLatestRequirementExtraction(
   projectId: number
 ): Promise<RequirementExtractionResponse> {
 
-  return apiRequest<RequirementExtractionResponse>(
+  return apiRequest<
+    RequirementExtractionResponse
+  >(
     `/requirements/project/${projectId}/latest`,
     {
       method: 'GET',
     }
   );
 }
+
+
+/* =========================================================
+   FUTURE ENDPOINTS
+
+   Do NOT implement these until the backend approval
+   workflow/controller is created.
+
+   Future examples:
+
+   getRequirementById(...)
+   getProjectRequirements(...)
+   approveRequirement(...)
+   rejectRequirement(...)
+   updateRequirement(...)
+
+   We intentionally do not invent endpoint URLs here.
+   ========================================================= */
