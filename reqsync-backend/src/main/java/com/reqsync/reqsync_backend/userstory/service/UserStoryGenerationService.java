@@ -18,6 +18,9 @@ import com.reqsync.reqsync_backend.requirement.entity.Requirement;
 import com.reqsync.reqsync_backend.requirement.enums.RequirementStatus;
 import com.reqsync.reqsync_backend.requirement.repository.RequirementRepository;
 
+import com.reqsync.reqsync_backend.traceability.entity.TraceabilityArtifactType;
+import com.reqsync.reqsync_backend.traceability.service.TraceabilityService;
+
 import com.reqsync.reqsync_backend.userstory.dto.GeneratedUserStory;
 import com.reqsync.reqsync_backend.userstory.dto.UserStoryResponse;
 import com.reqsync.reqsync_backend.userstory.dto.UserStoryUpdateRequest;
@@ -31,7 +34,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 
 @Service
@@ -58,6 +63,9 @@ public class UserStoryGenerationService {
     private final ObjectMapper
             objectMapper;
 
+    private final TraceabilityService
+            traceabilityService;
+
 
     public UserStoryGenerationService(
             GeminiClient geminiClient,
@@ -66,7 +74,8 @@ public class UserStoryGenerationService {
             ProjectRepository projectRepository,
             ProjectMemberRepository projectMemberRepository,
             UserRepository userRepository,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            TraceabilityService traceabilityService
     ) {
 
         this.geminiClient =
@@ -89,6 +98,9 @@ public class UserStoryGenerationService {
 
         this.objectMapper =
                 objectMapper;
+
+        this.traceabilityService =
+                traceabilityService;
     }
 
 
@@ -121,7 +133,7 @@ public class UserStoryGenerationService {
         );
 
 
-        List<Requirement> requirements =
+        List<Requirement> allRequirements =
                 requirementRepository
                         .findByProjectId(
                                 projectId
@@ -129,9 +141,9 @@ public class UserStoryGenerationService {
 
 
         if (
-                requirements == null
+                allRequirements == null
                         ||
-                        requirements.isEmpty()
+                        allRequirements.isEmpty()
         ) {
 
             throw new RuntimeException(
@@ -150,10 +162,51 @@ public class UserStoryGenerationService {
          * Requirements that already have a user story
          * are also ignored.
          */
-        List<Requirement> requirementsToGenerate =
-                requirements
+        List<Requirement> approvedRequirements =
+                allRequirements
                         .stream()
+                        .filter(
+                                requirement ->
+                                        requirement.getStatus()
+                                                != null
+                                                &&
+                                                "APPROVED"
+                                                        .equalsIgnoreCase(
+                                                                requirement
+                                                                        .getStatus()
+                                                                        .name()
+                                                        )
+                        )
+                        .toList();
 
+
+        if (
+                approvedRequirements.isEmpty()
+        ) {
+
+            throw new RuntimeException(
+                    "No approved requirements are available. " +
+                            "The Business Analyst must approve requirements before generating user stories."
+            );
+        }
+
+
+        /*
+         * Existing user stories created before traceability
+         * was introduced are linked automatically if their
+         * source Requirement is now APPROVED.
+         */
+        syncExistingUserStoryTraceability(
+                projectId
+        );
+
+
+        /*
+         * Generate only missing stories.
+         */
+        List<Requirement> requirementsToGenerate =
+                approvedRequirements
+                        .stream()
                         .filter(
                                 requirement ->
                                         requirement.getStatus()
@@ -168,7 +221,6 @@ public class UserStoryGenerationService {
                                                         requirement.getId()
                                                 )
                         )
-
                         .toList();
 
 
@@ -228,14 +280,42 @@ public class UserStoryGenerationService {
                         );
 
 
+        if (
+                geminiResponse == null
+                        ||
+                        geminiResponse.isBlank()
+        ) {
+
+            throw new RuntimeException(
+                    "Gemini returned an empty response."
+            );
+        }
+
+
         List<GeneratedUserStory> generatedStories =
                 parseGeminiResponse(
                         geminiResponse
                 );
 
 
+        if (
+                generatedStories == null
+                        ||
+                        generatedStories.isEmpty()
+        ) {
+
+            throw new RuntimeException(
+                    "Gemini did not generate any user stories."
+            );
+        }
+
+
         List<UserStory> savedStories =
                 new ArrayList<>();
+
+
+        Set<Long> processedRequirementIds =
+                new HashSet<>();
 
 
         long existingCount =
@@ -254,25 +334,44 @@ public class UserStoryGenerationService {
                 : generatedStories
         ) {
 
+            validateGeneratedStory(
+                    generated
+            );
+
+
+            Long sourceRequirementId =
+                    generated
+                            .getSourceRequirementId();
+
+
+            /*
+             * Gemini cannot return two stories for
+             * the same requirement during one run.
+             */
+            if (
+                    processedRequirementIds
+                            .contains(
+                                    sourceRequirementId
+                            )
+            ) {
+
+                continue;
+            }
+
+
             Requirement sourceRequirement =
                     requirementsToGenerate
                             .stream()
-
                             .filter(
                                     requirement ->
                                             requirement
                                                     .getId()
                                                     .equals(
-                                                            generated
-                                                                    .getSourceRequirementId()
+                                                            sourceRequirementId
                                                     )
                             )
-
                             .findFirst()
-
-                            .orElse(
-                                    null
-                            );
+                            .orElse(null);
 
 
             /*
@@ -299,11 +398,6 @@ public class UserStoryGenerationService {
 
                 continue;
             }
-
-
-            validateGeneratedStory(
-                    generated
-            );
 
 
             UserStory story =
@@ -375,9 +469,6 @@ public class UserStoryGenerationService {
             }
 
 
-            /*
-             * Preserve requirement priority.
-             */
             story.setPriority(
                     sourceRequirement
                             .getPriority()
@@ -389,15 +480,51 @@ public class UserStoryGenerationService {
             );
 
 
-            savedStories.add(
+            UserStory savedStory =
                     userStoryRepository
                             .save(
                                     story
-                            )
+                            );
+
+
+            /*
+             * =================================================
+             * END-TO-END TRACEABILITY
+             *
+             * REQ-001 → US-001
+             * =================================================
+             */
+            traceabilityService
+                    .linkUserStory(
+                            projectId,
+                            sourceRequirement.getId(),
+                            savedStory.getId(),
+                            savedStory.getCode(),
+                            savedStory.getTitle()
+                    );
+
+
+            savedStories.add(
+                    savedStory
+            );
+
+
+            processedRequirementIds.add(
+                    sourceRequirement.getId()
             );
 
 
             storyNumber++;
+        }
+
+
+        if (
+                savedStories.isEmpty()
+        ) {
+
+            throw new RuntimeException(
+                    "Gemini did not return valid user stories for the approved requirements."
+            );
         }
 
 
@@ -493,6 +620,39 @@ public class UserStoryGenerationService {
         );
 
 
+        /*
+         * A User Story belonging to a non-approved
+         * source Requirement cannot continue downstream.
+         */
+        Requirement sourceRequirement =
+                requirementRepository
+                        .findById(
+                                story.getSourceRequirementId()
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new RuntimeException(
+                                                "Source requirement not found."
+                                        )
+                        );
+
+
+        if (
+                sourceRequirement.getStatus() == null
+                        ||
+                        !"APPROVED".equalsIgnoreCase(
+                                sourceRequirement
+                                        .getStatus()
+                                        .name()
+                        )
+        ) {
+
+            throw new IllegalStateException(
+                    "Only user stories linked to APPROVED requirements can be modified in the traceable workflow."
+            );
+        }
+
+
         if (
                 request.getTitle() != null
                         &&
@@ -500,7 +660,9 @@ public class UserStoryGenerationService {
         ) {
 
             story.setTitle(
-                    request.getTitle().trim()
+                    request
+                            .getTitle()
+                            .trim()
             );
         }
 
@@ -512,7 +674,9 @@ public class UserStoryGenerationService {
         ) {
 
             story.setActor(
-                    request.getActor().trim()
+                    request
+                            .getActor()
+                            .trim()
             );
         }
 
@@ -524,7 +688,9 @@ public class UserStoryGenerationService {
         ) {
 
             story.setGoal(
-                    request.getGoal().trim()
+                    request
+                            .getGoal()
+                            .trim()
             );
         }
 
@@ -536,7 +702,9 @@ public class UserStoryGenerationService {
         ) {
 
             story.setBenefit(
-                    request.getBenefit().trim()
+                    request
+                            .getBenefit()
+                            .trim()
             );
         }
 
@@ -567,7 +735,8 @@ public class UserStoryGenerationService {
 
 
         if (
-                request.getPriority() != null
+                request.getPriority()
+                        != null
         ) {
 
             story.setPriority(
@@ -577,7 +746,8 @@ public class UserStoryGenerationService {
 
 
         if (
-                request.getReviewed() != null
+                request.getReviewed()
+                        != null
         ) {
 
             story.setReviewed(
@@ -586,11 +756,28 @@ public class UserStoryGenerationService {
         }
 
 
-        return toResponse(
+        UserStory savedStory =
                 userStoryRepository
                         .save(
                                 story
-                        )
+                        );
+
+
+        /*
+         * UPSERT traceability metadata.
+         */
+        traceabilityService
+                .linkUserStory(
+                        savedStory.getProjectId(),
+                        savedStory.getSourceRequirementId(),
+                        savedStory.getId(),
+                        savedStory.getCode(),
+                        savedStory.getTitle()
+                );
+
+
+        return toResponse(
+                savedStory
         );
     }
 
@@ -637,9 +824,111 @@ public class UserStoryGenerationService {
         );
 
 
-        userStoryRepository.delete(
-                story
-        );
+        /*
+         * Remove traceability link before deleting story.
+         */
+        traceabilityService
+                .removeArtifactLinks(
+                        TraceabilityArtifactType.USER_STORY,
+                        story.getId()
+                );
+
+
+        userStoryRepository
+                .delete(
+                        story
+                );
+    }
+
+
+    // =========================================================
+    // SYNC PRE-EXISTING USER STORY LINKS
+    // =========================================================
+
+    private void syncExistingUserStoryTraceability(
+            Long projectId
+    ) {
+
+        List<UserStory> existingStories =
+                userStoryRepository
+                        .findByProjectIdOrderByIdAsc(
+                                projectId
+                        );
+
+
+        for (
+                UserStory story
+                : existingStories
+        ) {
+
+            if (
+                    story.getSourceRequirementId()
+                            == null
+            ) {
+
+                continue;
+            }
+
+
+            Requirement requirement =
+                    requirementRepository
+                            .findById(
+                                    story.getSourceRequirementId()
+                            )
+                            .orElse(null);
+
+
+            if (
+                    requirement == null
+            ) {
+
+                continue;
+            }
+
+
+            if (
+                    requirement.getProjectId()
+                            == null
+                            ||
+                            !requirement
+                                    .getProjectId()
+                                    .equals(
+                                            projectId
+                                    )
+            ) {
+
+                continue;
+            }
+
+
+            /*
+             * Existing stories are traced ONLY when their
+             * source Requirement is currently APPROVED.
+             */
+            if (
+                    requirement.getStatus()
+                            == null
+                            ||
+                            !"APPROVED".equalsIgnoreCase(
+                                    requirement
+                                            .getStatus()
+                                            .name()
+                            )
+            ) {
+
+                continue;
+            }
+
+
+            traceabilityService
+                    .linkUserStory(
+                            projectId,
+                            requirement.getId(),
+                            story.getId(),
+                            story.getCode(),
+                            story.getTitle()
+                    );
+        }
     }
 
 
@@ -660,7 +949,7 @@ public class UserStoryGenerationService {
                 """
                 You are a senior Business Analyst.
 
-                Generate user stories from the supplied software requirements.
+                Generate user stories ONLY from the supplied APPROVED software requirements.
 
                 IMPORTANT RULES:
 
@@ -669,12 +958,14 @@ public class UserStoryGenerationService {
                 3. Do not use ```json code fences.
                 4. Each generated story MUST reference the exact sourceRequirementId supplied.
                 5. Do not invent requirement IDs.
-                6. Create one primary user story for each requirement that represents user/system behaviour.
-                7. Ignore purely internal technical statements that cannot reasonably become a user story.
-                8. Actor must represent the person or system role benefiting from the behaviour.
-                9. goal must NOT include "I want".
-                10. benefit must NOT include "so that".
-                11. Generate 2 to 5 testable acceptance criteria.
+                6. Generate at most one primary user story for each supplied requirement.
+                7. Create a user story only when the requirement represents user or system behaviour.
+                8. Ignore purely internal technical statements that cannot reasonably become a user story.
+                9. Actor must represent the person or system role benefiting from the behaviour.
+                10. goal must NOT include "I want".
+                11. benefit must NOT include "so that".
+                12. Generate 2 to 5 clear and testable acceptance criteria.
+                13. Do not introduce functionality that does not exist in the supplied requirement.
 
                 Return this exact JSON array structure:
 
@@ -703,7 +994,7 @@ public class UserStoryGenerationService {
 
 
         prompt.append(
-                "\n\nRequirements:\n"
+                "\n\nAPPROVED Requirements:\n"
         );
 
 
@@ -785,6 +1076,11 @@ public class UserStoryGenerationService {
             prompt.append(
                     requirement.getExpectedOutcome()
             );
+
+
+            prompt.append(
+                    "\nstatus: APPROVED"
+            );
         }
 
 
@@ -850,6 +1146,32 @@ public class UserStoryGenerationService {
                     cleaned.trim();
 
 
+            int firstArray =
+                    cleaned.indexOf(
+                            '['
+                    );
+
+
+            int lastArray =
+                    cleaned.lastIndexOf(
+                            ']'
+                    );
+
+
+            if (
+                    firstArray >= 0
+                            &&
+                            lastArray > firstArray
+            ) {
+
+                cleaned =
+                        cleaned.substring(
+                                firstArray,
+                                lastArray + 1
+                        );
+            }
+
+
             return objectMapper
                     .readValue(
                             cleaned,
@@ -877,6 +1199,16 @@ public class UserStoryGenerationService {
     private void validateGeneratedStory(
             GeneratedUserStory story
     ) {
+
+        if (
+                story == null
+        ) {
+
+            throw new RuntimeException(
+                    "Gemini generated an invalid user story."
+            );
+        }
+
 
         if (
                 story.getSourceRequirementId()
@@ -941,7 +1273,8 @@ public class UserStoryGenerationService {
                 story.getAcceptanceCriteria()
                         == null
                         ||
-                        story.getAcceptanceCriteria()
+                        story
+                                .getAcceptanceCriteria()
                                 .isEmpty()
         ) {
 
@@ -1035,9 +1368,11 @@ public class UserStoryGenerationService {
         if (
                 authentication == null
                         ||
-                        authentication.getName() == null
+                        authentication.getName()
+                                == null
                         ||
-                        authentication.getName().isBlank()
+                        authentication.getName()
+                                .isBlank()
         ) {
 
             throw new RuntimeException(
@@ -1085,15 +1420,26 @@ public class UserStoryGenerationService {
 
         try {
 
-            criteria =
-                    objectMapper
-                            .readValue(
-                                    story.getAcceptanceCriteria(),
-                                    new TypeReference<
-                                            List<String>
-                                            >() {
-                                    }
-                            );
+            if (
+                    story.getAcceptanceCriteria()
+                            != null
+                            &&
+                            !story
+                                    .getAcceptanceCriteria()
+                                    .isBlank()
+            ) {
+
+                criteria =
+                        objectMapper
+                                .readValue(
+                                        story.getAcceptanceCriteria(),
+
+                                        new TypeReference<
+                                                List<String>
+                                                >() {
+                                        }
+                                );
+            }
 
         } catch (Exception ignored) {
         }
