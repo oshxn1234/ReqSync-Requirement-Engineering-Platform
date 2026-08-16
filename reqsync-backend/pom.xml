@@ -150,7 +150,7 @@
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-            <scope>test</scope>
+            <scope>runtime</scope>
         </dependency>
 
 
@@ -293,7 +293,7 @@
 
                 <configuration>
 
-                    <release>21</release>
+                    <release>25</release>
 
                     <annotationProcessorPaths>
 

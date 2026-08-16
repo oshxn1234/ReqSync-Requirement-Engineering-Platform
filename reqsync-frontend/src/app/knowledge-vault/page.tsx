@@ -2,12 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useProjectStore, KnowledgeItem } from '@/store/projectStore';
+import { getProjectKnowledge } from '@/lib/knowledge-api';
 import { Database, Search, Plus, Filter, BookOpen, FileText, CheckCircle2, ShieldAlert, Cpu, RotateCw, X, Users, Sparkles } from 'lucide-react';
 
 export default function KnowledgeVaultPage() {
   const [mounted, setMounted] = useState(false);
   const knowledgeVault = useProjectStore((state) => state.knowledgeVault);
   const addKnowledge = useProjectStore((state) => state.addKnowledge);
+
+  const [remoteKnowledge, setRemoteKnowledge] = useState<KnowledgeItem[] | null>(null);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
 
   // States
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,6 +32,20 @@ export default function KnowledgeVaultPage() {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      setRemoteError(null);
+      try {
+        const projId = 1; // TODO: derive from selected project
+        const items = await getProjectKnowledge(projId);
+        setRemoteKnowledge(items as any);
+      } catch (err: any) {
+        setRemoteError(err?.message ?? 'Unable to load remote knowledge');
+        setRemoteKnowledge(null);
+      }
+    })();
+  }, []);
+
   if (!mounted) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -36,8 +54,10 @@ export default function KnowledgeVaultPage() {
     );
   }
 
+  const sourceList = remoteKnowledge ?? knowledgeVault;
+
   // Filter vault items
-  const filteredVault = knowledgeVault.filter((item) => {
+  const filteredVault = sourceList.filter((item) => {
     const term = searchQuery.toLowerCase();
     if (!term) {
       return categoryFilter === 'All' || item.category === categoryFilter;
@@ -139,6 +159,11 @@ export default function KnowledgeVaultPage() {
           </button>
         </div>
       </div>
+      {remoteError && (
+        <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+          Backend knowledge service not available: using local vault data.
+        </div>
+      )}
 
       {/* Knowledge Vault Dashboard Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

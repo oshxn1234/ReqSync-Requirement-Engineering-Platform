@@ -20,6 +20,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import jakarta.servlet.DispatcherType;
+
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -214,6 +216,24 @@ public class SecurityConfig {
                                                 "/api/auth/me"
                                         )
                                         .authenticated()
+
+
+                                        /*
+                                         * ==================================
+                                         * ERROR DISPATCH
+                                         * ==================================
+                                         *
+                                         * When an exception escapes to the
+                                         * container, Tomcat forwards to the
+                                         * /error endpoint. That internal
+                                         * dispatch must stay public so real
+                                         * error status codes (400, 404, 500)
+                                         * are returned instead of a 403.
+                                         */
+                                        .dispatcherTypeMatchers(
+                                                DispatcherType.ERROR
+                                        )
+                                        .permitAll()
 
 
                                         /*
