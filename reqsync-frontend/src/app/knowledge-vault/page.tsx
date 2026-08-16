@@ -2,16 +2,42 @@
 
 import { useEffect, useState } from 'react';
 import { useProjectStore, KnowledgeItem } from '@/store/projectStore';
+import { useBackendProjectStore } from '@/store/backendProjectStore';
 import { getProjectKnowledge } from '@/lib/knowledge-api';
-import { Database, Search, Plus, Filter, BookOpen, FileText, CheckCircle2, ShieldAlert, Cpu, RotateCw, X, Users, Sparkles } from 'lucide-react';
+import { getProjectSrsVersions, getSrsById, SrsDocumentDto } from '@/lib/srs-api';
+import SrsDocumentView from '@/components/srs-document-view';
+import { Database, Search, Plus, BookOpen, FileText, CheckCircle2, ShieldAlert, Cpu, RotateCw, X, Users, Sparkles, Eye, FolderKanban, LayoutGrid, Layers } from 'lucide-react';
+
+const CATEGORY_OPTIONS = ['All', 'Requirements', 'Decisions', 'Lessons Learned', 'QA Findings', 'Templates'] as const;
+
+const CATEGORY_FILTER_ICONS: Record<(typeof CATEGORY_OPTIONS)[number], React.ReactNode> = {
+  All: <Layers className="w-4 h-4 text-slate-500" />,
+  Requirements: <FileText className="w-4 h-4 text-blue-600" />,
+  Decisions: <CheckCircle2 className="w-4 h-4 text-emerald-600" />,
+  'Lessons Learned': <BookOpen className="w-4 h-4 text-purple-600" />,
+  'QA Findings': <ShieldAlert className="w-4 h-4 text-rose-600" />,
+  Templates: <LayoutGrid className="w-4 h-4 text-amber-600" />,
+};
 
 export default function KnowledgeVaultPage() {
   const [mounted, setMounted] = useState(false);
   const knowledgeVault = useProjectStore((state) => state.knowledgeVault);
   const addKnowledge = useProjectStore((state) => state.addKnowledge);
 
+  const selectedProjectId = useBackendProjectStore((state) => state.selectedProjectId);
+
   const [remoteKnowledge, setRemoteKnowledge] = useState<KnowledgeItem[] | null>(null);
   const [remoteError, setRemoteError] = useState<string | null>(null);
+
+  // Generated documents state
+  const [generatedDocs, setGeneratedDocs] = useState<SrsDocumentDto[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [docsError, setDocsError] = useState<string | null>(null);
+
+  // Document viewer modal state
+  const [viewDoc, setViewDoc] = useState<SrsDocumentDto | null>(null);
+  const [viewDocLoading, setViewDocLoading] = useState(false);
+  const [viewDocError, setViewDocError] = useState<string | null>(null);
 
   // States
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,23 +54,57 @@ export default function KnowledgeVaultPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<string[] | null>(null);
 
+  const projectId = selectedProjectId ?? 1;
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
+    if (!mounted) return;
     (async () => {
       setRemoteError(null);
       try {
-        const projId = 1; // TODO: derive from selected project
-        const items = await getProjectKnowledge(projId);
+        const items = await getProjectKnowledge(projectId);
         setRemoteKnowledge(items as any);
       } catch (err: any) {
         setRemoteError(err?.message ?? 'Unable to load remote knowledge');
         setRemoteKnowledge(null);
       }
     })();
-  }, []);
+  }, [mounted, projectId]);
+
+  // Load every generated document (SRS) for the selected project
+  useEffect(() => {
+    if (!mounted) return;
+    (async () => {
+      try {
+        setDocsLoading(true);
+        setDocsError(null);
+        const docs = await getProjectSrsVersions(projectId);
+        setGeneratedDocs(docs);
+      } catch (err: any) {
+        setDocsError(err?.message ?? 'Unable to load generated documents');
+        setGeneratedDocs([]);
+      } finally {
+        setDocsLoading(false);
+      }
+    })();
+  }, [mounted, projectId]);
+
+  const openDocument = async (srsId: number) => {
+    try {
+      setViewDocLoading(true);
+      setViewDocError(null);
+      const doc = await getSrsById(srsId);
+      setViewDoc(doc);
+    } catch (err: any) {
+      setViewDocError(err?.message ?? 'Unable to load document');
+      setViewDoc(null);
+    } finally {
+      setViewDocLoading(false);
+    }
+  };
 
   if (!mounted) {
     return (
@@ -240,22 +300,75 @@ export default function KnowledgeVaultPage() {
             </div>
           )}
 
+          {/* Generated Documents panel */}
+          <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-3xs space-y-4">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <FolderKanban className="w-4 h-4 text-blue-600" />
+              Generated Documents
+            </h3>
+
+            {docsLoading && (
+              <div className="flex items-center gap-1.5 text-xs text-slate-400 py-2">
+                <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                Loading documents...
+              </div>
+            )}
+
+            {docsError && (
+              <p className="text-[10px] text-rose-500 font-semibold">{docsError}</p>
+            )}
+
+            {!docsLoading && !docsError && generatedDocs.length === 0 && (
+              <p className="text-[11px] text-slate-400 font-medium">
+                No generated documents for this project yet.
+              </p>
+            )}
+
+            {!docsLoading && !docsError && generatedDocs.length > 0 && (
+              <div className="space-y-2">
+                {generatedDocs.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-bold text-slate-700 truncate">
+                        SRS v{doc.version} - {doc.projectName}
+                      </div>
+                      <div className="text-[9px] text-slate-400 font-semibold mt-0.5">
+                        {doc.status} • {new Date(doc.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => openDocument(doc.id)}
+                      className="p-1.5 border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-all cursor-pointer shrink-0"
+                      title="View document"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Category Filter panel */}
           <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-3xs space-y-4">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Filter Categories</h3>
             
             <div className="flex flex-col gap-1.5">
-              {(['All', 'Requirements', 'Decisions', 'Lessons Learned', 'QA Findings', 'Templates'] as const).map((cat) => (
+              {CATEGORY_OPTIONS.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setCategoryFilter(cat)}
-                  className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition-all cursor-pointer ${
                     categoryFilter === cat
                       ? 'bg-blue-50 text-blue-700 font-bold border-l-3 border-blue-600 shadow-2xs'
                       : 'hover:bg-slate-50 text-slate-600 font-semibold'
                   }`}
                 >
-                  {cat}
+                  <span>{cat}</span>
+                  <span className="shrink-0">{CATEGORY_FILTER_ICONS[cat]}</span>
                 </button>
               ))}
             </div>
@@ -359,6 +472,15 @@ export default function KnowledgeVaultPage() {
                 </div>
                 <div className="shrink-0 flex items-center gap-3">
                   <span className="text-[10px] text-slate-400 font-semibold">{item.date}</span>
+                  {(item as any).referenceType === 'SRS' && (item as any).referenceId && (
+                    <button
+                      onClick={() => openDocument((item as any).referenceId)}
+                      className="p-2 border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-all cursor-pointer"
+                      title="View generated document"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                  )}
                   <div className="p-2 border border-slate-100 rounded-lg bg-slate-50/50">
                     {getCategoryIcon(item.category)}
                   </div>
@@ -438,6 +560,46 @@ export default function KnowledgeVaultPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Document Viewer Modal */}
+      {viewDoc && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="px-6 py-4.5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+              <div className="min-w-0">
+                <h3 className="font-extrabold text-slate-800 text-sm tracking-wide truncate">
+                  {viewDoc.title}
+                </h3>
+                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                  Version {viewDoc.version} • {viewDoc.status} • {new Date(viewDoc.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+              <button
+                onClick={() => setViewDoc(null)}
+                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-all cursor-pointer shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {viewDocLoading && (
+              <div className="flex items-center gap-2 text-sm text-slate-600 py-10 justify-center">
+                <RotateCw className="w-4 h-4 animate-spin" /> Loading document...
+              </div>
+            )}
+
+            {viewDocError && (
+              <div className="p-6 text-sm text-rose-600">{viewDocError}</div>
+            )}
+
+            {!viewDocLoading && !viewDocError && (
+              <div className="p-6 overflow-y-auto flex-grow scrollbar-thin">
+                <SrsDocumentView document={viewDoc} projectCode={`PRJ-${viewDoc.projectId}`} />
+              </div>
+            )}
           </div>
         </div>
       )}

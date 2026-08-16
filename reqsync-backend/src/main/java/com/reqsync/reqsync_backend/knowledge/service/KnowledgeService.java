@@ -173,7 +173,9 @@ public class KnowledgeService {
                 item.getTitle(),
                 item.getProjectName(),
                 item.getCategory(),
-                item.getDate().toString()
+                item.getDate().toString(),
+                item.getReferenceType(),
+                item.getReferenceId()
         );
     }
 }

@@ -6,6 +6,8 @@ export interface KnowledgeItemDto {
   project: string;
   category: string;
   date: string;
+  referenceType?: string;
+  referenceId?: number;
 }
 
 export async function getProjectKnowledge(projectId: number): Promise<KnowledgeItemDto[]> {
