@@ -14,6 +14,25 @@ import java.util.List;
 @RequestMapping("/api/knowledge")
 public class KnowledgeController {
 
+    /*
+     * =================================================================
+     * KNOWLEDGE VAULT ENDPOINTS
+     * =================================================================
+     *
+     *  GET  /api/knowledge
+     *     Returns the full knowledge vault for the authenticated
+     *     user's business. NOT scoped to a single project: it
+     *     aggregates reusable data from ALL completed projects
+     *     plus shared general resources.
+     *
+     *  POST /api/knowledge
+     *     Adds a new vault item. If the item references a project,
+     *     that project must already be COMPLETED.
+     *
+     * Both endpoints require a valid JWT.
+     * =================================================================
+     */
+
     private final KnowledgeService
             knowledgeService;
 

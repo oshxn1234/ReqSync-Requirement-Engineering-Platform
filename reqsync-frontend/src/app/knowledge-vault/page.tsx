@@ -1,5 +1,24 @@
 'use client';
 
+/*
+ * =================================================================
+ * KNOWLEDGE VAULT PAGE
+ * =================================================================
+ *
+ * Displays the platform's shared knowledge vault.
+ *
+ *  - The vault is NOT project specific: it aggregates reusable
+ *    data from ALL completed projects in the user's business.
+ *  - Only data from COMPLETED projects appears here (plus shared
+ *    general/template resources). In-progress work is hidden.
+ *  - Backend source of truth: GET /api/knowledge.
+ *
+ * NOTE: The "Generated Documents" panel below intentionally stays
+ * scoped to the currently selected project - it is a document
+ * viewer, not part of the vault's reusable knowledge list.
+ * =================================================================
+ */
+
 import { useEffect, useState } from 'react';
 import { useProjectStore, KnowledgeItem } from '@/store/projectStore';
 import { useBackendProjectStore } from '@/store/backendProjectStore';

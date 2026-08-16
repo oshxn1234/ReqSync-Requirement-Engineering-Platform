@@ -29,6 +29,41 @@ import java.util.Set;
 @Service
 public class KnowledgeService {
 
+    /*
+     * =================================================================
+     * KNOWLEDGE VAULT
+     * =================================================================
+     *
+     * The Knowledge Vault is the platform's shared, cross-project
+     * repository of reusable knowledge (requirements templates,
+     * architectural decisions, lessons learned, QA findings and
+     * generated SRS documents).
+     *
+     * RULES:
+     *
+     *  1. NOT project specific.
+     *     The vault aggregates historical data from EVERY completed
+     *     project inside the authenticated user's business, so new
+     *     projects can reuse lessons from all past work - not just
+     *     the currently selected project.
+     *
+     *  2. Only COMPLETED projects are published.
+     *     A project's data (e.g. its SRS documents) only becomes
+     *     visible in the vault once the project status is COMPLETED.
+     *     Work that is still in progress is never exposed as
+     *     reusable knowledge.
+     *
+     *  3. Business scoped.
+     *     Each business only sees the completed projects it owns.
+     *
+     *  4. Shared resources.
+     *     Vault items not tied to any project (projectId == null),
+     *     such as standard templates and general lessons, are always
+     *     visible to every user with vault access.
+     *
+     * =================================================================
+     */
+
     private final KnowledgeItemRepository
             knowledgeItemRepository;
 
