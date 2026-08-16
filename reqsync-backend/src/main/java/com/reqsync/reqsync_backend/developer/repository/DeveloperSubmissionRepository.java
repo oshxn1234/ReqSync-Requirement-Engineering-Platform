@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
+
 public interface DeveloperSubmissionRepository
         extends JpaRepository<DeveloperSubmission, Long> {
 
@@ -21,8 +22,13 @@ public interface DeveloperSubmissionRepository
     );
 
 
-    List<DeveloperSubmission>
-    findByStatus(
+    List<DeveloperSubmission> findByStatus(
             SubmissionStatus status
     );
+
+
+    /*
+     * QA queue/history.
+     */
+    List<DeveloperSubmission> findAllByOrderBySubmittedAtDesc();
 }
