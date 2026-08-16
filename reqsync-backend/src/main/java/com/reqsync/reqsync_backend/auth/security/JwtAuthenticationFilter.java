@@ -8,8 +8,12 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+
 import org.springframework.security.core.userdetails.UserDetails;
 
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -24,9 +28,16 @@ import java.io.IOException;
 public class JwtAuthenticationFilter
         extends OncePerRequestFilter {
 
+    private static final Logger log =
+            LoggerFactory.getLogger(
+                    JwtAuthenticationFilter.class
+            );
+
+
     private final JwtService jwtService;
 
-    private final CustomUserDetailsService userDetailsService;
+    private final CustomUserDetailsService
+            userDetailsService;
 
 
     public JwtAuthenticationFilter(
@@ -42,10 +53,6 @@ public class JwtAuthenticationFilter
     }
 
 
-    // ==========================================
-    // JWT Filter
-    // ==========================================
-
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -53,95 +60,222 @@ public class JwtAuthenticationFilter
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-
-        // ==========================================
-        // Get Authorization Header
-        // ==========================================
-
         final String authorizationHeader =
-                request.getHeader("Authorization");
-
-
-        String jwt = null;
-
-        String email = null;
-
-
-        // ==========================================
-        // Check Bearer Token
-        // ==========================================
-
-        if (authorizationHeader != null &&
-                authorizationHeader.startsWith("Bearer ")) {
-
-            jwt =
-                    authorizationHeader.substring(7);
-
-            try {
-
-                email =
-                        jwtService.extractUsername(jwt);
-
-            } catch (Exception exception) {
-
-                // Invalid JWT
-                // Continue the request without authentication
-
-                email = null;
-            }
-        }
-
-
-        // ==========================================
-        // Authenticate User
-        // ==========================================
-
-        if (email != null &&
-                SecurityContextHolder
-                        .getContext()
-                        .getAuthentication() == null) {
-
-            UserDetails userDetails =
-                    userDetailsService
-                            .loadUserByUsername(email);
-
-
-            // ==========================================
-            // Validate JWT
-            // ==========================================
-
-            if (jwtService.isTokenValid(
-                    jwt,
-                    userDetails
-            )) {
-
-                UsernamePasswordAuthenticationToken
-                        authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
-
-
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource()
-                                .buildDetails(request)
+                request.getHeader(
+                        "Authorization"
                 );
 
 
-                SecurityContextHolder
-                        .getContext()
-                        .setAuthentication(
-                                authentication
-                        );
-            }
+        /*
+         * No Authorization header.
+         *
+         * Continue normally.
+         * Spring Security will later decide whether
+         * the endpoint is public or protected.
+         */
+        if (
+                authorizationHeader == null
+                        ||
+                        authorizationHeader.isBlank()
+        ) {
+
+            filterChain.doFilter(
+                    request,
+                    response
+            );
+
+            return;
         }
 
 
-        // ==========================================
-        // Continue Request
-        // ==========================================
+        /*
+         * Authorization exists,
+         * but it is not Bearer authentication.
+         */
+        if (
+                !authorizationHeader
+                        .startsWith(
+                                "Bearer "
+                        )
+        ) {
+
+            log.warn(
+                    "Authorization header does not start with Bearer for {} {}",
+                    request.getMethod(),
+                    request.getRequestURI()
+            );
+
+
+            filterChain.doFilter(
+                    request,
+                    response
+            );
+
+            return;
+        }
+
+
+        /*
+         * Remove:
+         *
+         * Bearer
+         *
+         * and trim accidental spaces.
+         */
+        String jwt =
+                authorizationHeader
+                        .substring(7)
+                        .trim();
+
+
+        if (jwt.isBlank()) {
+
+            log.warn(
+                    "Empty JWT received for {} {}",
+                    request.getMethod(),
+                    request.getRequestURI()
+            );
+
+
+            filterChain.doFilter(
+                    request,
+                    response
+            );
+
+            return;
+        }
+
+
+        try {
+
+            /*
+             * Extract email stored in JWT subject.
+             */
+            String email =
+                    jwtService
+                            .extractUsername(
+                                    jwt
+                            );
+
+
+            if (
+                    email == null
+                            ||
+                            email.isBlank()
+            ) {
+
+                log.warn(
+                        "JWT contains no username."
+                );
+
+
+                filterChain.doFilter(
+                        request,
+                        response
+                );
+
+                return;
+            }
+
+
+            /*
+             * Do not overwrite an existing
+             * SecurityContext authentication.
+             */
+            if (
+                    SecurityContextHolder
+                            .getContext()
+                            .getAuthentication()
+                            == null
+            ) {
+
+                UserDetails userDetails =
+                        userDetailsService
+                                .loadUserByUsername(
+                                        email
+                                );
+
+
+                if (
+                        jwtService
+                                .isTokenValid(
+                                        jwt,
+                                        userDetails
+                                )
+                ) {
+
+                    UsernamePasswordAuthenticationToken
+                            authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
+
+
+                    authentication.setDetails(
+                            new WebAuthenticationDetailsSource()
+                                    .buildDetails(
+                                            request
+                                    )
+                    );
+
+
+                    SecurityContextHolder
+                            .getContext()
+                            .setAuthentication(
+                                    authentication
+                            );
+
+
+                    log.info(
+                            "JWT authenticated user: {} authorities: {}",
+                            userDetails.getUsername(),
+                            userDetails.getAuthorities()
+                    );
+
+                } else {
+
+                    log.warn(
+                            "JWT validation failed for user: {}",
+                            email
+                    );
+                }
+            }
+
+        } catch (Exception exception) {
+
+            /*
+             * IMPORTANT:
+             *
+             * This log allows us to see the REAL
+             * reason instead of silently producing 403.
+             *
+             * Examples:
+             *
+             * ExpiredJwtException
+             * SignatureException
+             * MalformedJwtException
+             */
+            log.error(
+                    "JWT authentication failed for {} {}. {}: {}",
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    exception
+                            .getClass()
+                            .getSimpleName(),
+                    exception.getMessage()
+            );
+
+
+            /*
+             * Make sure invalid JWT authentication
+             * never remains in SecurityContext.
+             */
+            SecurityContextHolder
+                    .clearContext();
+        }
+
 
         filterChain.doFilter(
                 request,

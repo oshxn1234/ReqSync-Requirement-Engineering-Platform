@@ -1,13 +1,28 @@
 package com.reqsync.reqsync_backend.requirement.service;
 
+import com.reqsync.reqsync_backend.auth.entity.Role;
+import com.reqsync.reqsync_backend.auth.entity.User;
+import com.reqsync.reqsync_backend.auth.repository.UserRepository;
+
+import com.reqsync.reqsync_backend.project.entity.ProjectMember;
+import com.reqsync.reqsync_backend.project.repository.ProjectMemberRepository;
+
 import com.reqsync.reqsync_backend.requirement.dto.ExtractedRequirementResponse;
+import com.reqsync.reqsync_backend.requirement.dto.RequirementStatusUpdateRequest;
 import com.reqsync.reqsync_backend.requirement.dto.RequirementSummaryResponse;
 import com.reqsync.reqsync_backend.requirement.dto.RequirementUpdateRequest;
+
 import com.reqsync.reqsync_backend.requirement.entity.Requirement;
+
 import com.reqsync.reqsync_backend.requirement.enums.RequirementStatus;
 import com.reqsync.reqsync_backend.requirement.enums.RequirementType;
+
 import com.reqsync.reqsync_backend.requirement.repository.RequirementRepository;
+
 import com.reqsync.reqsync_backend.requirement.service.semantic.RequirementEmbeddingService;
+
+import org.springframework.security.core.Authentication;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,16 +32,20 @@ import java.util.List;
 @Transactional
 public class RequirementService {
 
-    private final RequirementRepository
-            requirementRepository;
+    private final RequirementRepository requirementRepository;
 
-    private final RequirementEmbeddingService
-            requirementEmbeddingService;
+    private final RequirementEmbeddingService requirementEmbeddingService;
+
+    private final UserRepository userRepository;
+
+    private final ProjectMemberRepository projectMemberRepository;
 
 
     public RequirementService(
             RequirementRepository requirementRepository,
-            RequirementEmbeddingService requirementEmbeddingService
+            RequirementEmbeddingService requirementEmbeddingService,
+            UserRepository userRepository,
+            ProjectMemberRepository projectMemberRepository
     ) {
 
         this.requirementRepository =
@@ -34,30 +53,28 @@ public class RequirementService {
 
         this.requirementEmbeddingService =
                 requirementEmbeddingService;
+
+        this.userRepository =
+                userRepository;
+
+        this.projectMemberRepository =
+                projectMemberRepository;
     }
 
 
-    /**
-     * Get one requirement by ID.
-     */
+    // ==========================================
+    // GET REQUIREMENT BY ID
+    // ==========================================
+
     @Transactional(readOnly = true)
     public ExtractedRequirementResponse getById(
             Long requirementId
     ) {
 
         Requirement requirement =
-                requirementRepository
-                        .findById(
-                                requirementId
-                        )
-                        .orElseThrow(
-                                () ->
-                                        new RuntimeException(
-                                                "Requirement not found: "
-                                                        + requirementId
-                                        )
-                        );
-
+                getRequirement(
+                        requirementId
+                );
 
         return toResponse(
                 requirement
@@ -65,13 +82,12 @@ public class RequirementService {
     }
 
 
-    /**
-     * Get all requirements belonging
-     * to a project.
-     */
+    // ==========================================
+    // GET PROJECT REQUIREMENTS
+    // ==========================================
+
     @Transactional(readOnly = true)
-    public List<RequirementSummaryResponse>
-    getByProject(
+    public List<RequirementSummaryResponse> getByProject(
             Long projectId
     ) {
 
@@ -87,10 +103,10 @@ public class RequirementService {
     }
 
 
-    /**
-     * Get requirements by project
-     * and status.
-     */
+    // ==========================================
+    // GET BY STATUS
+    // ==========================================
+
     @Transactional(readOnly = true)
     public List<RequirementSummaryResponse>
     getByProjectAndStatus(
@@ -111,10 +127,10 @@ public class RequirementService {
     }
 
 
-    /**
-     * Get requirements by project
-     * and type.
-     */
+    // ==========================================
+    // GET BY TYPE
+    // ==========================================
+
     @Transactional(readOnly = true)
     public List<RequirementSummaryResponse>
     getByProjectAndType(
@@ -135,13 +151,10 @@ public class RequirementService {
     }
 
 
-    /**
-     * Update an existing requirement.
-     *
-     * Important:
-     * After updating title or description,
-     * regenerate semantic embedding.
-     */
+    // ==========================================
+    // FULL UPDATE
+    // ==========================================
+
     public ExtractedRequirementResponse update(
             Long requirementId,
             RequirementUpdateRequest request
@@ -156,62 +169,32 @@ public class RequirementService {
 
 
         Requirement requirement =
-                requirementRepository
-                        .findById(
-                                requirementId
-                        )
-                        .orElseThrow(
-                                () ->
-                                        new RuntimeException(
-                                                "Requirement not found: "
-                                                        + requirementId
-                                        )
-                        );
+                getRequirement(
+                        requirementId
+                );
 
 
-        /*
-         * Update title.
-         */
         requirement.setTitle(
                 request.getTitle()
         );
 
-
-        /*
-         * Update description.
-         */
         requirement.setDescription(
                 request.getDescription()
         );
 
-
-        /*
-         * Update requirement type.
-         */
         requirement.setType(
                 request.getType()
         );
 
-
-        /*
-         * Update priority.
-         */
         requirement.setPriority(
                 request.getPriority()
         );
 
-
-        /*
-         * Update lifecycle status.
-         */
         requirement.setStatus(
                 request.getStatus()
         );
 
 
-        /*
-         * Save changes.
-         */
         Requirement updated =
                 requirementRepository.save(
                         requirement
@@ -219,16 +202,8 @@ public class RequirementService {
 
 
         /*
-         * ------------------------------------------------
-         * REGENERATE EMBEDDING
-         * ------------------------------------------------
-         *
-         * The old embedding represented the
-         * previous title and description.
-         *
-         * Once requirement text changes,
-         * the semantic representation must
-         * also be updated.
+         * Regenerate semantic embedding because
+         * title or description may have changed.
          */
         try {
 
@@ -237,18 +212,13 @@ public class RequirementService {
                             updated.getId()
                     );
 
-        } catch (Exception embeddingException) {
+        } catch (Exception exception) {
 
-            /*
-             * Requirement update itself should
-             * not fail just because the external
-             * embedding API is temporarily unavailable.
-             */
             System.err.println(
                     "Unable to regenerate embedding for requirement "
                             + updated.getCode()
                             + ": "
-                            + embeddingException.getMessage()
+                            + exception.getMessage()
             );
         }
 
@@ -259,13 +229,127 @@ public class RequirementService {
     }
 
 
-    /**
-     * Delete a requirement.
-     *
-     * No separate embedding deletion is needed
-     * because the embedding exists in the same
-     * requirements table row.
-     */
+    // ==========================================
+    // BA APPROVE / REJECT
+    // ==========================================
+
+    public ExtractedRequirementResponse updateStatus(
+            Long requirementId,
+            RequirementStatusUpdateRequest request,
+            Authentication authentication
+    ) {
+
+        if (request == null) {
+
+            throw new IllegalArgumentException(
+                    "Requirement status update request cannot be null."
+            );
+        }
+
+
+        RequirementStatus newStatus =
+                request.getStatus();
+
+
+        if (newStatus == null) {
+
+            throw new IllegalArgumentException(
+                    "Requirement status is required."
+            );
+        }
+
+
+        /*
+         * BA review endpoint only performs
+         * final approve/reject decisions.
+         */
+        if (
+                newStatus != RequirementStatus.APPROVED
+                        &&
+                newStatus != RequirementStatus.REJECTED
+        ) {
+
+            throw new IllegalArgumentException(
+                    "Requirement status must be APPROVED or REJECTED."
+            );
+        }
+
+
+        Requirement requirement =
+                getRequirement(
+                        requirementId
+                );
+
+
+        User currentUser =
+                getAuthenticatedUser(
+                        authentication
+                );
+
+
+        if (
+                currentUser.getRole()
+                        != Role.BUSINESS_ANALYST
+        ) {
+
+            throw new RuntimeException(
+                    "Only a Business Analyst can approve or reject requirements."
+            );
+        }
+
+
+        /*
+         * BA must belong to the requirement's project.
+         */
+        ProjectMember membership =
+                projectMemberRepository
+                        .findByProjectIdAndUserId(
+                                requirement.getProjectId(),
+                                currentUser.getId()
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new RuntimeException(
+                                                "Business Analyst is not assigned to this project."
+                                        )
+                        );
+
+
+        if (!membership.isActive()) {
+
+            throw new RuntimeException(
+                    "Business Analyst project membership is inactive."
+            );
+        }
+
+
+        /*
+         * Status-only change.
+         *
+         * No embedding regeneration is required
+         * because title and description do not change.
+         */
+        requirement.setStatus(
+                newStatus
+        );
+
+
+        Requirement updated =
+                requirementRepository.save(
+                        requirement
+                );
+
+
+        return toResponse(
+                updated
+        );
+    }
+
+
+    // ==========================================
+    // DELETE
+    // ==========================================
+
     public void delete(
             Long requirementId
     ) {
@@ -291,9 +375,75 @@ public class RequirementService {
     }
 
 
-    /**
-     * Convert entity into complete DTO.
-     */
+    // ==========================================
+    // REQUIREMENT LOOKUP
+    // ==========================================
+
+    private Requirement getRequirement(
+            Long requirementId
+    ) {
+
+        if (requirementId == null) {
+
+            throw new IllegalArgumentException(
+                    "Requirement ID is required."
+            );
+        }
+
+
+        return requirementRepository
+                .findById(
+                        requirementId
+                )
+                .orElseThrow(
+                        () ->
+                                new RuntimeException(
+                                        "Requirement not found: "
+                                                + requirementId
+                                )
+                );
+    }
+
+
+    // ==========================================
+    // AUTH USER
+    // ==========================================
+
+    private User getAuthenticatedUser(
+            Authentication authentication
+    ) {
+
+        if (
+                authentication == null
+                        ||
+                authentication.getName() == null
+                        ||
+                authentication.getName().isBlank()
+        ) {
+
+            throw new RuntimeException(
+                    "Authenticated user could not be determined."
+            );
+        }
+
+
+        return userRepository
+                .findByEmailIgnoreCase(
+                        authentication.getName()
+                )
+                .orElseThrow(
+                        () ->
+                                new RuntimeException(
+                                        "Authenticated user not found."
+                                )
+                );
+    }
+
+
+    // ==========================================
+    // FULL RESPONSE
+    // ==========================================
+
     private ExtractedRequirementResponse toResponse(
             Requirement requirement
     ) {
@@ -311,11 +461,11 @@ public class RequirementService {
     }
 
 
-    /**
-     * Convert entity into summary DTO.
-     */
-    private RequirementSummaryResponse
-    toSummaryResponse(
+    // ==========================================
+    // SUMMARY RESPONSE
+    // ==========================================
+
+    private RequirementSummaryResponse toSummaryResponse(
             Requirement requirement
     ) {
 
