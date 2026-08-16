@@ -137,7 +137,8 @@ Record<string, string[]> = {
   '/knowledge-vault': [
     'CEO',
     'Project Manager',
-    'Business Analyst'
+    'Developer',
+    'QA Engineer'
   ],
   '/srs': [
     'Project Manager',

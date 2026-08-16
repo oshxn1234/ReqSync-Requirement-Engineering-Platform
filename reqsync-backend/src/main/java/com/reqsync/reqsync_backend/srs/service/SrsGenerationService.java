@@ -8,9 +8,7 @@ import com.reqsync.reqsync_backend.ai.client.GeminiClient;
 import com.reqsync.reqsync_backend.auth.entity.User;
 import com.reqsync.reqsync_backend.auth.repository.UserRepository;
 
-import com.reqsync.reqsync_backend.knowledge.entity.KnowledgeItem;
-import com.reqsync.reqsync_backend.knowledge.enums.KnowledgeCategory;
-import com.reqsync.reqsync_backend.knowledge.repository.KnowledgeItemRepository;
+import com.reqsync.reqsync_backend.knowledge.service.KnowledgeService;
 
 import com.reqsync.reqsync_backend.project.entity.Project;
 import com.reqsync.reqsync_backend.project.repository.ProjectRepository;
@@ -56,8 +54,8 @@ public class SrsGenerationService {
     private final UserRepository
             userRepository;
 
-    private final KnowledgeItemRepository
-            knowledgeItemRepository;
+    private final KnowledgeService
+            knowledgeService;
 
     private final ObjectMapper
             objectMapper;
@@ -68,7 +66,7 @@ public class SrsGenerationService {
             RequirementRepository requirementRepository,
             ProjectRepository projectRepository,
             UserRepository userRepository,
-            KnowledgeItemRepository knowledgeItemRepository,
+            KnowledgeService knowledgeService,
             ObjectMapper objectMapper
     ) {
 
@@ -87,8 +85,8 @@ public class SrsGenerationService {
         this.userRepository =
                 userRepository;
 
-        this.knowledgeItemRepository =
-                knowledgeItemRepository;
+        this.knowledgeService =
+                knowledgeService;
 
         this.objectMapper =
                 objectMapper;
@@ -212,10 +210,19 @@ public class SrsGenerationService {
                                 document
                         );
 
-        saveToKnowledgeVault(
-                project,
-                savedDocument
-        );
+        /*
+         * Only completed projects publish their
+         * SRS document into the Knowledge Vault.
+         *
+         * publishSrsToVault() ignores non-completed
+         * projects, so work in progress is never
+         * exposed as reusable knowledge.
+         */
+        knowledgeService
+                .publishSrsToVault(
+                        project,
+                        savedDocument
+                );
 
         return toResponse(
                 savedDocument
@@ -463,68 +470,6 @@ public class SrsGenerationService {
         srsDocumentRepository
                 .delete(
                         document
-                );
-    }
-
-
-    // =========================================================
-    // KNOWLEDGE VAULT AUTO-SAVE
-    // =========================================================
-
-    /**
-     * Automatically publish every generated SRS document
-     * into the Knowledge Vault so it stays accessible.
-     */
-    private void saveToKnowledgeVault(
-            Project project,
-            SrsDocument document
-    ) {
-
-        KnowledgeItem item =
-                new KnowledgeItem();
-
-        item.setCode(
-                "K-"
-                        + String.format(
-                                "%02d",
-                                knowledgeItemRepository.count() + 1
-                        )
-        );
-
-        item.setProjectId(
-                document.getProjectId()
-        );
-
-        item.setProjectName(
-                project.getName()
-        );
-
-        item.setTitle(
-                "SRS v"
-                        + document.getVersion()
-                        + " - "
-                        + project.getName()
-        );
-
-        item.setCategory(
-                KnowledgeCategory.TEMPLATES
-        );
-
-        item.setReferenceType(
-                "SRS"
-        );
-
-        item.setReferenceId(
-                document.getId()
-        );
-
-        item.setDate(
-                java.time.LocalDate.now()
-        );
-
-        knowledgeItemRepository
-                .save(
-                        item
                 );
     }
 

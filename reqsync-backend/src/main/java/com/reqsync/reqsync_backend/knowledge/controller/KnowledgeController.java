@@ -5,6 +5,7 @@ import com.reqsync.reqsync_backend.knowledge.dto.KnowledgeItemResponse;
 import com.reqsync.reqsync_backend.knowledge.service.KnowledgeService;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,22 +28,19 @@ public class KnowledgeController {
 
 
     // ==========================================
-    // GET PROJECT KNOWLEDGE
+    // GET KNOWLEDGE VAULT
     // ==========================================
 
-    @GetMapping(
-            "/project/{projectId}"
-    )
+    @GetMapping
     public ResponseEntity<List<KnowledgeItemResponse>>
-    getProjectKnowledge(
-            @PathVariable
-            Long projectId
+    getKnowledgeVault(
+            Authentication authentication
     ) {
 
         return ResponseEntity.ok(
                 knowledgeService
-                        .getProjectKnowledge(
-                                projectId
+                        .getKnowledgeVault(
+                                authentication
                         )
         );
     }
@@ -56,13 +54,15 @@ public class KnowledgeController {
     public ResponseEntity<KnowledgeItemResponse>
     createKnowledge(
             @RequestBody
-            CreateKnowledgeItemRequest request
+            CreateKnowledgeItemRequest request,
+            Authentication authentication
     ) {
 
         return ResponseEntity.ok(
                 knowledgeService
                         .createKnowledge(
-                                request
+                                request,
+                                authentication
                         )
         );
     }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useProjectStore, KnowledgeItem } from '@/store/projectStore';
 import { useBackendProjectStore } from '@/store/backendProjectStore';
-import { getProjectKnowledge } from '@/lib/knowledge-api';
+import { getKnowledgeVault } from '@/lib/knowledge-api';
 import { getProjectSrsVersions, getSrsById, SrsDocumentDto } from '@/lib/srs-api';
 import SrsDocumentView from '@/components/srs-document-view';
 import { Database, Search, Plus, BookOpen, FileText, CheckCircle2, ShieldAlert, Cpu, RotateCw, X, Users, Sparkles, Eye, FolderKanban, LayoutGrid, Layers } from 'lucide-react';
@@ -65,14 +65,14 @@ export default function KnowledgeVaultPage() {
     (async () => {
       setRemoteError(null);
       try {
-        const items = await getProjectKnowledge(projectId);
+        const items = await getKnowledgeVault();
         setRemoteKnowledge(items as any);
       } catch (err: any) {
         setRemoteError(err?.message ?? 'Unable to load remote knowledge');
         setRemoteKnowledge(null);
       }
     })();
-  }, [mounted, projectId]);
+  }, [mounted]);
 
   // Load every generated document (SRS) for the selected project
   useEffect(() => {
@@ -206,7 +206,7 @@ export default function KnowledgeVaultPage() {
             <Database className="w-6.5 h-6.5 text-blue-600" />
             Knowledge Vault
           </h1>
-          <p className="text-slate-500 text-sm">Access architectural patterns, governance compliance checklists, standards, and lessons learned database.</p>
+          <p className="text-slate-500 text-sm">Reusable knowledge from all <span className="font-bold text-slate-600">completed</span> projects across your business. Not limited to the current project.</p>
         </div>
 
         <div className="flex gap-2 self-end md:self-center">
