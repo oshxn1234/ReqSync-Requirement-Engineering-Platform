@@ -1,7 +1,9 @@
 'use client';
 
-import { Bell, Search, Settings, HelpCircle, ChevronDown, CheckCircle, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Bell, Search, Settings, HelpCircle, ChevronDown, PanelLeftClose, PanelLeftOpen, Check, RotateCw, FolderKanban } from 'lucide-react';
 import { useProjectStore } from '@/store/projectStore';
+import { useBackendProjectStore } from '@/store/backendProjectStore';
+import { getAllProjects } from '@/lib/project-api';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
@@ -10,7 +12,16 @@ export default function Header() {
   const approvals = useProjectStore((state) => state.approvals);
   const toggleSidebar = useProjectStore((state) => state.toggleSidebar);
   const isSidebarOpen = useProjectStore((state) => state.isSidebarOpen);
+  const updateSettings = useProjectStore((state) => state.updateSettings);
+
+  const projects = useBackendProjectStore((state) => state.projects);
+  const selectedProjectId = useBackendProjectStore((state) => state.selectedProjectId);
+  const setProjects = useBackendProjectStore((state) => state.setProjects);
+  const selectProject = useBackendProjectStore((state) => state.selectProject);
+
   const [mounted, setMounted] = useState(false);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [activeNotificationTab, setActiveNotificationTab] = useState<'system' | 'approvals'>('system');
 
@@ -27,6 +38,52 @@ export default function Header() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Load real projects from the backend for the selector
+  useEffect(() => {
+    if (!mounted) return;
+    const loadProjects = async () => {
+      try {
+        setProjectsLoading(true);
+        setProjectsError(null);
+        const response = await getAllProjects();
+        setProjects(response);
+      } catch (err: any) {
+        setProjectsError(err?.message ?? 'Unable to load projects.');
+      } finally {
+        setProjectsLoading(false);
+      }
+    };
+    void loadProjects();
+  }, [mounted, setProjects]);
+
+  // Keep the mock settings store in sync with the selected backend project
+  useEffect(() => {
+    if (!mounted || selectedProjectId === null) return;
+    const active = projects.find((p) => p.id === selectedProjectId);
+    if (!active) return;
+    if (settings.projectName !== active.name || settings.projectId !== active.id) {
+      updateSettings({
+        projectId: active.id,
+        projectName: active.name,
+        projectCode: `PRJ-${active.id}`,
+      });
+    }
+  }, [mounted, selectedProjectId, projects, settings.projectName, settings.projectId, updateSettings]);
+
+  const handleSelectProject = (projectId: number) => {
+    selectProject(projectId);
+    const project = projects.find((p) => p.id === projectId);
+    if (project) {
+      updateSettings({
+        projectId: project.id,
+        projectName: project.name,
+        projectCode: `PRJ-${project.id}`,
+      });
+    }
+  };
+
+  const toProjectCode = (projectId: number) => `PRJ-${projectId}`;
 
   if (!mounted) {
     return (
@@ -56,27 +113,60 @@ export default function Header() {
           )}
         </button>
         <div className="relative group">
-          <button className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3.5 py-1.5 rounded-xl text-sm font-semibold text-slate-800 transition-colors">
+          <button className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3.5 py-1.5 rounded-xl text-sm font-semibold text-slate-800 transition-colors cursor-pointer">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Project: {settings.projectName}</span>
+            <span className="max-w-48 truncate">Project: {settings.projectName}</span>
             <ChevronDown className="w-4 h-4 text-slate-500" />
           </button>
           
-          {/* Mock Dropdown items */}
-          <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-150 py-1.5 text-sm text-slate-700">
+          {/* Real backend project dropdown */}
+          <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-150 py-1.5 text-sm text-slate-700 z-40 max-h-80 overflow-y-auto scrollbar-thin">
             <div className="px-3 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider">Select Project</div>
-            <button className="w-full text-left px-3 py-2 bg-blue-50 text-blue-700 font-medium flex items-center justify-between">
-              <span>{settings.projectName}</span>
-              <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold">{settings.projectCode}</span>
-            </button>
-            <button className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center justify-between text-slate-400 cursor-not-allowed">
-              <span>E-Commerce Portal</span>
-              <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">ECO-2025</span>
-            </button>
-            <button className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center justify-between text-slate-400 cursor-not-allowed">
-              <span>HR Management System</span>
-              <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">HR-2026</span>
-            </button>
+
+            {projectsLoading && (
+              <div className="px-3 py-2 text-xs text-slate-400 flex items-center gap-1.5">
+                <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                Loading projects...
+              </div>
+            )}
+
+            {projectsError && (
+              <div className="px-3 py-2 text-xs text-rose-500 font-semibold">{projectsError}</div>
+            )}
+
+            {!projectsLoading && !projectsError && projects.length === 0 && (
+              <div className="px-3 py-2 text-xs text-slate-400 flex items-center gap-1.5">
+                <FolderKanban className="w-3.5 h-3.5" />
+                No projects found
+              </div>
+            )}
+
+            {projects.map((project) => {
+              const isActive = project.id === selectedProjectId;
+              return (
+                <button
+                  key={project.id}
+                  onClick={() => handleSelectProject(project.id)}
+                  className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 cursor-pointer ${
+                    isActive
+                      ? 'bg-blue-50 text-blue-700 font-medium'
+                      : 'hover:bg-slate-50 text-slate-600'
+                  }`}
+                >
+                  <span className="truncate">{project.name}</span>
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      isActive
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {toProjectCode(project.id)}
+                    </span>
+                    {isActive && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

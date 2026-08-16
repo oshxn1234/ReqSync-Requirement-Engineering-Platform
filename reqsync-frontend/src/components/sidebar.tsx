@@ -137,6 +137,11 @@ Record<string, string[]> = {
   '/knowledge-vault': [
     'CEO',
     'Project Manager',
+    'Developer',
+    'QA Engineer'
+  ],
+  '/srs': [
+    'Project Manager',
     'Business Analyst'
   ],
 };
@@ -245,6 +250,12 @@ const navItems = [
     name: 'Knowledge Vault',
     href: '/knowledge-vault',
     icon: Database
+  },
+
+  {
+    name: 'SRS',
+    href: '/srs',
+    icon: FileText
   },
 
 

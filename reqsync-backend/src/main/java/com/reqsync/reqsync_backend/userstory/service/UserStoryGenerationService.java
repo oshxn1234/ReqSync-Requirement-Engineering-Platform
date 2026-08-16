@@ -15,6 +15,7 @@ import com.reqsync.reqsync_backend.project.repository.ProjectMemberRepository;
 import com.reqsync.reqsync_backend.project.repository.ProjectRepository;
 
 import com.reqsync.reqsync_backend.requirement.entity.Requirement;
+import com.reqsync.reqsync_backend.requirement.enums.RequirementStatus;
 import com.reqsync.reqsync_backend.requirement.repository.RequirementRepository;
 
 import com.reqsync.reqsync_backend.traceability.entity.TraceabilityArtifactType;
@@ -36,6 +37,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 
 @Service
 @Transactional
@@ -102,9 +104,9 @@ public class UserStoryGenerationService {
     }
 
 
-    // =========================================================
+    // ==========================================
     // GENERATE
-    // =========================================================
+    // ==========================================
 
     public List<UserStoryResponse>
     generate(
@@ -151,9 +153,14 @@ public class UserStoryGenerationService {
 
 
         /*
-         * =====================================================
-         * APPROVED REQUIREMENTS ONLY
-         * =====================================================
+         * Only APPROVED requirements are allowed
+         * to generate user stories.
+         *
+         * Draft, Review and Rejected requirements
+         * are completely ignored.
+         *
+         * Requirements that already have a user story
+         * are also ignored.
          */
         List<Requirement> approvedRequirements =
                 allRequirements
@@ -202,6 +209,12 @@ public class UserStoryGenerationService {
                         .stream()
                         .filter(
                                 requirement ->
+                                        requirement.getStatus()
+                                                == RequirementStatus.APPROVED
+                        )
+
+                        .filter(
+                                requirement ->
                                         !userStoryRepository
                                                 .existsByProjectIdAndSourceRequirementId(
                                                         projectId,
@@ -215,6 +228,34 @@ public class UserStoryGenerationService {
                 requirementsToGenerate.isEmpty()
         ) {
 
+            boolean hasApprovedRequirement =
+                    requirements
+                            .stream()
+
+                            .anyMatch(
+                                    requirement ->
+                                            requirement.getStatus()
+                                                    == RequirementStatus.APPROVED
+                            );
+
+
+            /*
+             * No approved requirements exist.
+             */
+            if (
+                    !hasApprovedRequirement
+            ) {
+
+                throw new RuntimeException(
+                        "No approved requirements are available for user story generation."
+                );
+            }
+
+
+            /*
+             * Approved requirements exist,
+             * but they already have generated stories.
+             */
             return getProjectUserStories(
                     projectId,
                     authentication
@@ -222,6 +263,9 @@ public class UserStoryGenerationService {
         }
 
 
+        /*
+         * Only approved requirements reach Gemini.
+         */
         String prompt =
                 buildPrompt(
                         project,
@@ -331,10 +375,10 @@ public class UserStoryGenerationService {
 
 
             /*
-             * Invented, rejected, draft or another project's
-             * requirement ID will not be accepted because
-             * requirementsToGenerate contains approved
-             * requirements from this project only.
+             * Do not allow Gemini to create
+             * references to requirements that
+             * do not belong to the approved
+             * requirement list.
              */
             if (
                     sourceRequirement == null
@@ -486,16 +530,18 @@ public class UserStoryGenerationService {
 
         return savedStories
                 .stream()
+
                 .map(
                         this::toResponse
                 )
+
                 .toList();
     }
 
 
-    // =========================================================
+    // ==========================================
     // GET STORIES
-    // =========================================================
+    // ==========================================
 
     @Transactional(readOnly = true)
     public List<UserStoryResponse>
@@ -520,17 +566,20 @@ public class UserStoryGenerationService {
                 .findByProjectIdOrderByIdAsc(
                         projectId
                 )
+
                 .stream()
+
                 .map(
                         this::toResponse
                 )
+
                 .toList();
     }
 
 
-    // =========================================================
+    // ==========================================
     // UPDATE STORY
-    // =========================================================
+    // ==========================================
 
     public UserStoryResponse update(
             Long storyId,
@@ -549,6 +598,7 @@ public class UserStoryGenerationService {
                         .findById(
                                 storyId
                         )
+
                         .orElseThrow(
                                 () ->
                                         new RuntimeException(
@@ -732,9 +782,9 @@ public class UserStoryGenerationService {
     }
 
 
-    // =========================================================
-    // DELETE STORY
-    // =========================================================
+    // ==========================================
+    // DELETE
+    // ==========================================
 
     public void delete(
             Long storyId,
@@ -752,6 +802,7 @@ public class UserStoryGenerationService {
                         .findById(
                                 storyId
                         )
+
                         .orElseThrow(
                                 () ->
                                         new RuntimeException(
@@ -881,9 +932,9 @@ public class UserStoryGenerationService {
     }
 
 
-    // =========================================================
+    // ==========================================
     // PROMPT
-    // =========================================================
+    // ==========================================
 
     private String buildPrompt(
             Project project,
@@ -961,6 +1012,7 @@ public class UserStoryGenerationService {
                     "sourceRequirementId: "
             );
 
+
             prompt.append(
                     requirement.getId()
             );
@@ -969,6 +1021,7 @@ public class UserStoryGenerationService {
             prompt.append(
                     "\ncode: "
             );
+
 
             prompt.append(
                     requirement.getCode()
@@ -979,6 +1032,7 @@ public class UserStoryGenerationService {
                     "\ntitle: "
             );
 
+
             prompt.append(
                     requirement.getTitle()
             );
@@ -987,6 +1041,7 @@ public class UserStoryGenerationService {
             prompt.append(
                     "\ndescription: "
             );
+
 
             prompt.append(
                     requirement.getDescription()
@@ -997,6 +1052,7 @@ public class UserStoryGenerationService {
                     "\ntype: "
             );
 
+
             prompt.append(
                     requirement.getType()
             );
@@ -1006,6 +1062,7 @@ public class UserStoryGenerationService {
                     "\nactors: "
             );
 
+
             prompt.append(
                     requirement.getActors()
             );
@@ -1014,6 +1071,7 @@ public class UserStoryGenerationService {
             prompt.append(
                     "\nexpectedOutcome: "
             );
+
 
             prompt.append(
                     requirement.getExpectedOutcome()
@@ -1030,9 +1088,9 @@ public class UserStoryGenerationService {
     }
 
 
-    // =========================================================
+    // ==========================================
     // PARSE GEMINI
-    // =========================================================
+    // ==========================================
 
     private List<GeneratedUserStory>
     parseGeminiResponse(
@@ -1134,9 +1192,9 @@ public class UserStoryGenerationService {
     }
 
 
-    // =========================================================
+    // ==========================================
     // VALIDATE GENERATED STORY
-    // =========================================================
+    // ==========================================
 
     private void validateGeneratedStory(
             GeneratedUserStory story
@@ -1227,9 +1285,9 @@ public class UserStoryGenerationService {
     }
 
 
-    // =========================================================
+    // ==========================================
     // PROJECT
-    // =========================================================
+    // ==========================================
 
     private Project getProject(
             Long projectId,
@@ -1243,6 +1301,7 @@ public class UserStoryGenerationService {
                                 .getBusiness()
                                 .getId()
                 )
+
                 .orElseThrow(
                         () ->
                                 new RuntimeException(
@@ -1252,9 +1311,9 @@ public class UserStoryGenerationService {
     }
 
 
-    // =========================================================
+    // ==========================================
     // BA ACCESS
-    // =========================================================
+    // ==========================================
 
     private void validateBAAccess(
             Project project,
@@ -1278,6 +1337,7 @@ public class UserStoryGenerationService {
                                 project.getId(),
                                 currentUser.getId()
                         )
+
                         .orElseThrow(
                                 () ->
                                         new RuntimeException(
@@ -1297,9 +1357,9 @@ public class UserStoryGenerationService {
     }
 
 
-    // =========================================================
+    // ==========================================
     // AUTH USER
-    // =========================================================
+    // ==========================================
 
     private User getAuthenticatedUser(
             Authentication authentication
@@ -1325,6 +1385,7 @@ public class UserStoryGenerationService {
                 .findByEmailIgnoreCase(
                         authentication.getName()
                 )
+
                 .orElseThrow(
                         () ->
                                 new RuntimeException(
@@ -1334,9 +1395,9 @@ public class UserStoryGenerationService {
     }
 
 
-    // =========================================================
+    // ==========================================
     // RESPONSE
-    // =========================================================
+    // ==========================================
 
     private UserStoryResponse toResponse(
             UserStory story
@@ -1347,7 +1408,10 @@ public class UserStoryGenerationService {
                         .findById(
                                 story.getSourceRequirementId()
                         )
-                        .orElse(null);
+
+                        .orElse(
+                                null
+                        );
 
 
         List<String> criteria =

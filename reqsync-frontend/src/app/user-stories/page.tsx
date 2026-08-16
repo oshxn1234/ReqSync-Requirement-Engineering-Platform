@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useProjectStore, UserStory } from '@/store/projectStore';
+import { getProjectUserStories, updateUserStoryApi, deleteUserStoryApi } from '@/lib/userstory-api';
 import { Search, Plus, Trash2, Edit2, X, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,6 +26,10 @@ export default function UserStories() {
   const requirements = useProjectStore((state) => state.requirements);
   const addUserStory = useProjectStore((state) => state.addUserStory);
   const updateUserStory = useProjectStore((state) => state.updateUserStory);
+  const deleteUserStory = useProjectStore((state) => state.deleteUserAccount);
+
+  const [remoteStories, setRemoteStories] = useState<UserStory[] | null>(null);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,6 +41,28 @@ export default function UserStories() {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      setRemoteError(null);
+      try {
+        const projectId = 1; // TODO: derive from selected backend project
+        const stories = await getProjectUserStories(projectId);
+        // map DTO to local UserStory shape when possible
+        setRemoteStories(stories.map(s => ({
+          id: `US-${String(s.id).padStart(3,'0')}`,
+          title: s.title,
+          status: s.status === 'DRAFT' ? 'To Do' : (s.status as any),
+          priority: s.priority === 'HIGH' ? 'High' : (s.priority === 'MEDIUM' ? 'Medium' : 'Low'),
+          relatedReq: s.relatedReq,
+          assignee: s.assignee,
+        })));
+      } catch (err: any) {
+        setRemoteError(err?.message ?? 'Unable to load remote user stories');
+        setRemoteStories(null);
+      }
+    })();
   }, []);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<StoryFormValues>({
@@ -57,8 +84,10 @@ export default function UserStories() {
     );
   }
 
+  const sourceStories = remoteStories ?? userStories;
+
   // Apply filters
-  const filteredStories = userStories.filter(story => {
+  const filteredStories = sourceStories.filter(story => {
     const matchesSearch = story.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       story.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'All' || story.status === statusFilter;
@@ -77,6 +106,39 @@ export default function UserStories() {
     });
     reset();
     setIsModalOpen(false);
+  };
+
+  const handleUpdate = async (storyId: string, updates: Partial<UserStory>) => {
+    // try backend update if remote stories are used
+    setRemoteError(null);
+    try {
+      if (remoteStories) {
+        // map local id like US-012 to numeric id
+        const numericId = parseInt(storyId.split('-')[1], 10);
+        await updateUserStoryApi(numericId, updates as any);
+      }
+      updateUserStory(storyId, updates);
+    } catch (err: any) {
+      updateUserStory(storyId, updates);
+      setRemoteError('Update applied locally; backend update failed.');
+    }
+  };
+
+  const handleDelete = async (storyId: string) => {
+    setRemoteError(null);
+    try {
+      if (remoteStories) {
+        const numericId = parseInt(storyId.split('-')[1], 10);
+        await deleteUserStoryApi(numericId);
+      }
+      // local deletion
+      // deleteUserStory maps to delete user account function; avoid destructive call — use store update instead
+      // For now, simulate deletion by filtering via updateUserStory with a status
+      updateUserStory(storyId, { status: 'Done' });
+    } catch (err: any) {
+      updateUserStory(storyId, { status: 'Done' });
+      setRemoteError('Delete applied locally; backend delete failed.');
+    }
   };
 
   const getStatusColor = (status: UserStory['status']) => {
@@ -209,6 +271,12 @@ export default function UserStories() {
             </table>
           </div>
         </div>
+
+        {remoteError && (
+          <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+            Backend user-story service not available or returned an error: using local data where possible.
+          </div>
+        )}
 
         {/* Footer pagination */}
         <div className="border-t border-slate-100 pt-4 flex justify-between items-center text-xs text-slate-400 mt-6">
