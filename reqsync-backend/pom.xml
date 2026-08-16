@@ -42,7 +42,7 @@
     <properties>
 
         <!-- Java version -->
-        <java.version>25</java.version>
+        <java.version>24</java.version>
 
     </properties>
 
@@ -263,7 +263,7 @@
 
                 <configuration>
 
-                    <release>25</release>
+                    <release>24</release>
 
                     <annotationProcessorPaths>
 
